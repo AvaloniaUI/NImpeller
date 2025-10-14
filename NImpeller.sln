@@ -1,0 +1,46 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "NImpeller", "src\NImpeller\NImpeller.csproj", "{ADD4E749-9F52-4C18-9622-B378B9B1358C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{47455730-683D-4770-A523-41AEA5F4B463}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InteropGen", "src\InteropGen\InteropGen.csproj", "{B77C8CB3-4A46-4628-A6E1-F0900FE1FD6F}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "external", "external", "{3103307D-E646-40D3-8830-D3495B571192}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CppAst", "external\CppAst.NET\src\CppAst\CppAst.csproj", "{74938EB6-E59F-410E-96FB-C0C25B12AC19}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{FE23EB06-C41F-4FE7-9CE2-2C05323A3366}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sandbox", "samples\Sandbox\Sandbox.csproj", "{0E772191-50BF-4FEE-8E62-F5B71EA82B00}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ADD4E749-9F52-4C18-9622-B378B9B1358C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ADD4E749-9F52-4C18-9622-B378B9B1358C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ADD4E749-9F52-4C18-9622-B378B9B1358C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ADD4E749-9F52-4C18-9622-B378B9B1358C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B77C8CB3-4A46-4628-A6E1-F0900FE1FD6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B77C8CB3-4A46-4628-A6E1-F0900FE1FD6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B77C8CB3-4A46-4628-A6E1-F0900FE1FD6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B77C8CB3-4A46-4628-A6E1-F0900FE1FD6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{74938EB6-E59F-410E-96FB-C0C25B12AC19}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{74938EB6-E59F-410E-96FB-C0C25B12AC19}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{74938EB6-E59F-410E-96FB-C0C25B12AC19}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{74938EB6-E59F-410E-96FB-C0C25B12AC19}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0E772191-50BF-4FEE-8E62-F5B71EA82B00}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0E772191-50BF-4FEE-8E62-F5B71EA82B00}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0E772191-50BF-4FEE-8E62-F5B71EA82B00}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0E772191-50BF-4FEE-8E62-F5B71EA82B00}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{ADD4E749-9F52-4C18-9622-B378B9B1358C} = {47455730-683D-4770-A523-41AEA5F4B463}
+		{B77C8CB3-4A46-4628-A6E1-F0900FE1FD6F} = {47455730-683D-4770-A523-41AEA5F4B463}
+		{74938EB6-E59F-410E-96FB-C0C25B12AC19} = {3103307D-E646-40D3-8830-D3495B571192}
+		{0E772191-50BF-4FEE-8E62-F5B71EA82B00} = {FE23EB06-C41F-4FE7-9CE2-2C05323A3366}
+	EndGlobalSection
+EndGlobal

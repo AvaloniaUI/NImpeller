@@ -1,0 +1,3 @@
+[submodule "external/CppAst.NET"]
+	path = external/CppAst.NET
+	url = git@github.com:kekekeks/CppAst.NET.git

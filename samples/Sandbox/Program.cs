@@ -5,6 +5,8 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using NImpeller;
+using Sandbox;
+using Sandbox.Scenes;
 using Silk.NET.Core.Contexts;
 
 static unsafe  class Program
@@ -19,8 +21,6 @@ static unsafe  class Program
             return IntPtr.Zero;
         });
         var sdl = Sdl.GetApi();
-        
-        
 
         if (sdl.Init(Sdl.InitVideo) < 0)
         {
@@ -38,8 +38,8 @@ static unsafe  class Program
             "NImpeller on SDL",
             Sdl.WindowposCentered,
             Sdl.WindowposCentered,
-            800,
-            600,
+            1600,
+            900,
             (uint)(WindowFlags.Opengl | WindowFlags.Shown)
         );
 
@@ -51,6 +51,7 @@ static unsafe  class Program
             sdl.Quit();
             return;
         }
+        
 
         var context = sdl.GLCreateContext(window);
         if (context == null)
@@ -64,17 +65,26 @@ static unsafe  class Program
         var gl = GL.GetApi(new LamdaNativeContext(s => (IntPtr)sdl.GLGetProcAddress(s)));
 
         sdl.GLMakeCurrent(window, context);
-        sdl.GLSetSwapInterval(1); // Enable vsync
-        var impellerContext = ImpellerContext.CreateOpenGLESNew(name => (IntPtr)sdl.GLGetProcAddress(name))!;
+        sdl.GLSetSwapInterval(0); // Enable vsync
+        var impellerContext = ImpellerContext.CreateOpenGLESNew(name =>
+        {
+            Console.WriteLine(name);
+            return (IntPtr)sdl.GLGetProcAddress(name);
+        })!;
 
         int fbo;
         gl.GetInteger(GLEnum.FramebufferBinding, &fbo);
+        var renderer = Marshal.PtrToStringUTF8((IntPtr)gl.GetString(GLEnum.Renderer));
         ImpellerSurface? surface = null;
         ImpellerISize surfaceSize = default;
         
         bool running = true;
 
+        var scene = new MMarkScene();
+        
         var st = Stopwatch.StartNew();
+        var frames = 0;
+        var fps = 0;
         while (running)
         {
             Event evt;
@@ -101,32 +111,27 @@ static unsafe  class Program
             
             gl.Viewport(0, 0, (uint)width, (uint)height);
 
-            using var paint = ImpellerPaint.New()!;
-            paint.SetColor(ImpellerColor.FromRgb(255, 0, 0));
-            
-            using (var drawListBuilder = ImpellerDisplayListBuilder.New(new ImpellerRect(0, 0, width, height))!)
+
+            using (var drawListBuilder = ImpellerDisplayListBuilder.New(new ImpellerRect(100, 100, width, height))!)
             {
-                var time = st.Elapsed.TotalSeconds;
-                
-                for (int c = 0; c < 8; c++)
+                if (st.Elapsed.TotalSeconds > 1)
                 {
-                    var positionAngle = time + (c * 3.14 / 4);    
-                    var rotationAngle = -time + (c * 3.14 / 4);
-
-                    var center = new Vector2(
-                        width / 2f + (float)(Math.Cos(positionAngle) * 100),
-                        height / 2f + (float)(Math.Sin(positionAngle) * 100)
-                    );
-
-                    var transform = Matrix4x4.CreateRotationZ((float)rotationAngle) *
-                                    Matrix4x4.CreateTranslation(center.X, center.Y, 0);
-
-
-                    drawListBuilder.SetTransform(transform);
-                    
-                    
-                    drawListBuilder.DrawRect(new ImpellerRect(0, 0, 50, 50), paint);
+                    fps = (int)(frames / st.Elapsed.TotalSeconds);
+                    frames = 0;
+                    st.Restart();
+                    sdl.SetWindowTitle(window, "FPS: " + fps);
                 }
+
+                frames++;
+                
+                scene.Render(impellerContext, drawListBuilder, new SceneParameters()
+                {
+                    Width = width,
+                    Height = height
+                });
+                
+                
+                
                 using var displayList = drawListBuilder.CreateDisplayListNew()!;
                 surface.DrawDisplayList(displayList);
             }

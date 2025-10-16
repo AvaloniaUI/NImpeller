@@ -43,6 +43,7 @@ class NativePrimitiveType(string dotnetType) : NativeType
         [CppPrimitiveKind.Short] = new ("short"),
         [CppPrimitiveKind.UnsignedShort] = new ("ushort"),
         [CppPrimitiveKind.Int] = new("int"),
+        [CppPrimitiveKind.Bool] = new("int"),
         [CppPrimitiveKind.UnsignedInt] = new("uint"),
         [CppPrimitiveKind.LongLong] = new ("long"),
         [CppPrimitiveKind.UnsignedLongLong] = new ("ulong"),

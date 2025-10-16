@@ -19,8 +19,14 @@ class Program
             return;
         }
 
+        var impellerHeaderPath = Path.Combine(Directory.GetCurrentDirectory(), args[0]);
+        if (!File.Exists(impellerHeaderPath))
+        {
+            Console.WriteLine($"File not found: {impellerHeaderPath}");
+            return;
+        }
 
-        var model = NativeModel.Load(args[0], []);
+        var model = NativeModel.Load(impellerHeaderPath, []);
 
         var dir = typeof(Program).Assembly.Location;
         Directory.SetCurrentDirectory(Path.Combine(dir, ".."));

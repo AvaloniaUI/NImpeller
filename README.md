@@ -1,9 +1,22 @@
 # Impeller .NET bindings
 
 ### Running this thing
+
 1) Run InteropGen with /path/to/impeller.h as an argument and pray that ClangSharp is not completely broken for you
 2) Run Sandbox with /path/to/impeller.so (or dll/dylib) as an argument. It will only work for platforms where SDL2 can create a GLES context. I've only tested it with Linux with an Intel iGPU, so good luck.
 
+### Using pre-build Impeller binaries
+
+Flutter builds toolkit binaries on a nightly feed, that you can download from.
+
+Typical link is `https://storage.googleapis.com/flutter_infra_release/flutter/$FLUTTER_SHA/$PLATFORM_ARCH/impeller_sdk.zip`
+Where:
+- `$FLUTTER_SHA` is a commit hash
+- `$PLATFORM_ARCH` is one of `linux-arm64`, `linux-x64`, `windows-arm64`, `windows-x64`, `darwin-arm64`, `darwin-x64` or `android-arm64`
+
+From this zip you will need `include/impeller.h` and `lib/impeller.so` (or `impeller.dll`/`impeller.dylib`).
+
+See [Impeller Toolkit: Prebuilt Artifacts](https://github.com/flutter/flutter/blame/908eab56e04a0925fc3c1a7d4bff1f4ae6351ae3/engine/src/flutter/impeller/toolkit/interop/README.md#L22)
 
 ### Handles
 

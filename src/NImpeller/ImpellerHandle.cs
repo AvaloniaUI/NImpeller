@@ -1,8 +1,8 @@
-﻿using System;
+using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace NImpeller;
-
 
 abstract class ImpellerHandle : SafeHandle
 {
@@ -13,14 +13,16 @@ abstract class ImpellerHandle : SafeHandle
     public override bool IsInvalid => handle == IntPtr.Zero;
     private protected abstract void UnsafeRetain();
     private protected abstract void UnsafeRelease();
-    
+
     protected override bool ReleaseHandle()
     {
         UnsafeRelease();
         return true;
     }
-    
-    public static T RetainFromNative<T>(IntPtr ptr) where T : ImpellerHandle
+
+    public static T RetainFromNative<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)] T>(
+        IntPtr ptr) where T : ImpellerHandle
     {
         if (ptr == IntPtr.Zero)
         {

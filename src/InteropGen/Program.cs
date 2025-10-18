@@ -10,7 +10,7 @@ class Program
 
     static void Main(string[] args)
     {
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             setenv("LIBCLANG_DISABLE_CRASH_RECOVERY", "1", 1);
         
         if (args.Length != 1)

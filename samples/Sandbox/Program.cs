@@ -58,9 +58,19 @@ static unsafe  class Program
 
         if (apiType == GraphicsApi.OpenGL)
         {
-            sdl.GLSetAttribute(GLattr.ContextMajorVersion, 3);
-            sdl.GLSetAttribute(GLattr.ContextMinorVersion, 0);
-            sdl.GLSetAttribute(GLattr.ContextProfileMask, (int)GLprofile.ES);
+            if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                sdl.GLSetAttribute(GLattr.ContextMajorVersion, 3);
+                sdl.GLSetAttribute(GLattr.ContextMinorVersion, 3);
+                sdl.GLSetAttribute(GLattr.ContextProfileMask, (int)GLprofile.Core);
+                sdl.GLSetAttribute(GLattr.ContextFlags, (int)GLcontextFlag.ForwardCompatibleFlag);
+            }
+            else
+            {
+                sdl.GLSetAttribute(GLattr.ContextMajorVersion, 3);
+                sdl.GLSetAttribute(GLattr.ContextMinorVersion, 0);
+                sdl.GLSetAttribute(GLattr.ContextProfileMask, (int)GLprofile.ES);
+            }
         }
 
         var windowFlags = WindowFlags.Shown;

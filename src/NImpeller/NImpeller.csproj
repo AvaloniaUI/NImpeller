@@ -18,7 +18,6 @@
 
     <Target Name="EnsureBindingsGenerated" BeforeTargets="BeforeBuild">
         <PropertyGroup>
-            <BindingsExist Condition="Exists('$(GeneratedBindingsFile)')">true</BindingsExist>
             <BindingsExist Condition="!Exists('$(GeneratedBindingsFile)')">false</BindingsExist>
         </PropertyGroup>
 

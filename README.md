@@ -6,7 +6,7 @@ Generated bindings file is NOT checked out into the repo, because right now the 
 
 ### Running this thing
 
-1) Generate the Impeller bindings. This can by either using the InteropGen program directly with the `impeller.h` header, or use the Nuke task
+1) Generate the Impeller bindings. If you have never generated the bindings, they will be generated on first build of NImpeller via an MSBuild task. You should see this as `DownloadSdkAndGenerateBindings`. You can also use the InteropGen program directly with the `impeller.h` header, or use the Nuke task
 
 ```sh
 ./build.sh GenerateBindings

@@ -14,12 +14,16 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "samples", "samples", "{FE23
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Sandbox", "samples\Sandbox\Sandbox.csproj", "{0E772191-50BF-4FEE-8E62-F5B71EA82B00}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "_build", "build\_build.csproj", "{97B7BE2A-A06E-4A73-A383-A8D6EF51DDAB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{97B7BE2A-A06E-4A73-A383-A8D6EF51DDAB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{97B7BE2A-A06E-4A73-A383-A8D6EF51DDAB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ADD4E749-9F52-4C18-9622-B378B9B1358C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{ADD4E749-9F52-4C18-9622-B378B9B1358C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ADD4E749-9F52-4C18-9622-B378B9B1358C}.Release|Any CPU.ActiveCfg = Release|Any CPU

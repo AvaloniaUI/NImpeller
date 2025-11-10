@@ -8,6 +8,7 @@ public partial struct ImpellerTextDecoration
     /// <param name="type">The type of decoration (can be combined flags).</param>
     /// <param name="style">The style of the decoration line.</param>
     /// <param name="color">The color of the decoration.</param>
+    /// <param name="thickness_multiplier">The thickness multiplier of the decoration line.</param>
     public ImpellerTextDecoration(
         ImpellerTextDecorationType types,
         ImpellerTextDecorationStyle style,

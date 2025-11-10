@@ -44,10 +44,25 @@ public class ParagraphScene : IScene
 
         paint.SetColor(ImpellerColor.FromRgb(0, 0, 0));
         style.SetForeground(paint);
-        style.SetFontSize(24);
+        style.SetFontSize(12);
 
         paragraphBuilder.PushStyle(style);
-        paragraphBuilder.AddText("Font Sizes: 12pt, 18pt, 24pt, 36pt");
+        paragraphBuilder.AddText("Font Sizes: 12pt ");
+
+        style.SetFontSize(18);
+        paragraphBuilder.PushStyle(style);
+        paragraphBuilder.AddText("18pt ");
+        paragraphBuilder.PopStyle();
+
+        style.SetFontSize(24);
+        paragraphBuilder.PushStyle(style);
+        style.SetForeground(paint);
+        paragraphBuilder.AddText("24pt ");
+        paragraphBuilder.PopStyle();
+        style.SetFontSize(32);
+        paragraphBuilder.PushStyle(style);
+        paragraphBuilder.AddText("32pt");
+        paragraphBuilder.PopStyle();
 
         using var paragraph = paragraphBuilder.BuildParagraphNew(width: 600);
         builder.DrawParagraph(paragraph, new ImpellerPoint { X = x, Y = y });

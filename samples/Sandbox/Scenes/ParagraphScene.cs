@@ -23,7 +23,7 @@ public class ParagraphScene : IScene
 
         DrawTextExample3(scene, typographyContext, 10, 150);
 
-        // DrawTextExample4(scene, typographyContext, 10, 250);
+        DrawTextExample4(scene, typographyContext, 10, 250);
 
         DrawTextExample5(scene, typographyContext, 10, 350);
 
@@ -155,6 +155,68 @@ public class ParagraphScene : IScene
         }
     }
 
+    static void DrawTextExample4(
+    ImpellerDisplayListBuilder builder,
+    ImpellerTypographyContext context,
+    float x,
+    float y)
+    {
+        float yOffset = y;
+        using var paint = ImpellerPaint.New();
+        paint.SetColor(ImpellerColor.FromRgb(0, 0, 0));
+
+        // Underline
+        using (var paragraphBuilder = context.ParagraphBuilderNew())
+        using (var style = ImpellerParagraphStyle.New())
+        {
+            style.SetForeground(paint);
+            style.SetFontSize(18);
+            style.SetTextDecoration(ImpellerTextDecoration.Underline(ImpellerColor.FromRgb(255, 0, 0)));
+
+            paragraphBuilder.PushStyle(style);
+            paragraphBuilder.AddText("Underlined text");
+
+            using var paragraph = paragraphBuilder.BuildParagraphNew(width: 400);
+            builder.DrawParagraph(paragraph, new ImpellerPoint { X = x, Y = yOffset });
+            yOffset += 35;
+        }
+
+        // Line-through
+        using (var paragraphBuilder = context.ParagraphBuilderNew())
+        using (var style = ImpellerParagraphStyle.New())
+        {
+            style.SetForeground(paint);
+            style.SetFontSize(18);
+            style.SetTextDecoration(ImpellerTextDecoration.LineThrough(ImpellerColor.FromRgb(0, 0, 255)));
+
+            paragraphBuilder.PushStyle(style);
+            paragraphBuilder.AddText("Strikethrough text");
+
+            using var paragraph = paragraphBuilder.BuildParagraphNew(width: 400);
+            builder.DrawParagraph(paragraph, new ImpellerPoint { X = x, Y = yOffset });
+            yOffset += 35;
+        }
+
+        // Combined decorations
+        using (var paragraphBuilder = context.ParagraphBuilderNew())
+        using (var style = ImpellerParagraphStyle.New())
+        {
+            style.SetForeground(paint);
+            style.SetFontSize(25);
+            var decoration = new ImpellerTextDecoration(
+                ImpellerTextDecorationType.kImpellerTextDecorationTypeUnderline | ImpellerTextDecorationType.kImpellerTextDecorationTypeOverline,
+                ImpellerTextDecorationStyle.kImpellerTextDecorationStyleSolid,
+                ImpellerColor.FromRgb(0, 255, 0));
+            style.SetTextDecoration(decoration);
+
+            paragraphBuilder.PushStyle(style);
+            paragraphBuilder.AddText("Underline + Overline");
+
+            using var paragraph = paragraphBuilder.BuildParagraphNew(width: 400);
+            builder.DrawParagraph(paragraph, new ImpellerPoint { X = x, Y = yOffset });
+        }
+    }
+
     static void DrawTextExample5(
         ImpellerDisplayListBuilder builder,
         ImpellerTypographyContext context,
@@ -229,7 +291,7 @@ public class ParagraphScene : IScene
         paragraphBuilder.AddText(" text!");
 
         using var paragraph = paragraphBuilder.BuildParagraphNew(width: 500);
-        builder.DrawParagraph(paragraph,  new ImpellerPoint { X = x, Y = y });
+        builder.DrawParagraph(paragraph, new ImpellerPoint { X = x, Y = y });
     }
 
     static void DrawTextExampleCJK(ImpellerDisplayListBuilder builder,

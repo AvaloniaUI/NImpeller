@@ -9,4 +9,39 @@
         <IsAotCompatible>true</IsAotCompatible>
     </PropertyGroup>
 
+    <PropertyGroup>
+        <GeneratedBindingsFile>$(MSBuildProjectDirectory)/Generated/Bindings.g.cs</GeneratedBindingsFile>
+        <RootDirectory>$(MSBuildProjectDirectory)/../..</RootDirectory>
+        <NukeBuildScript Condition="$([MSBuild]::IsOSPlatform('Windows'))">$(RootDirectory)/build.cmd</NukeBuildScript>
+        <NukeBuildScript Condition="!$([MSBuild]::IsOSPlatform('Windows'))">$(RootDirectory)/build.sh</NukeBuildScript>
+    </PropertyGroup>
+
+    <Target Name="EnsureBindingsGenerated" BeforeTargets="BeforeBuild">
+        <PropertyGroup>
+            <BindingsExist Condition="!Exists('$(GeneratedBindingsFile)')">false</BindingsExist>
+        </PropertyGroup>
+
+        <Message Text="Checking for generated bindings at: $(GeneratedBindingsFile)" Importance="normal" />
+
+        <CallTarget Targets="DownloadSdkAndGenerateBindings" Condition="'$(BindingsExist)' == 'false'" />
+    </Target>
+
+    <Target Name="DownloadSdkAndGenerateBindings">
+        <Message Text="Generated bindings not found. Downloading linux-x64 Impeller SDK and generating bindings..." Importance="high" />
+
+        <Exec Command="$(NukeBuildScript) DownloadLatestImpeller --platform linux-x64"
+              WorkingDirectory="$(RootDirectory)"
+              IgnoreExitCode="false" />
+
+        <Exec Command="$(NukeBuildScript) GenerateBindings"
+              WorkingDirectory="$(RootDirectory)"
+              IgnoreExitCode="false" />
+
+        <Message Text="Successfully generated bindings at: $(GeneratedBindingsFile)" Importance="high" />
+
+         <ItemGroup>
+            <Compile Include="Generated\Bindings.g.cs" />
+        </ItemGroup>
+    </Target>
+
 </Project>

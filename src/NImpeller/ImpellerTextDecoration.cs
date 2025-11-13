@@ -1,5 +1,12 @@
 namespace NImpeller;
 
+/// <summary>
+/// Represents text decoration configuration including type, style, and color.
+/// </summary>
+/// <remarks>
+/// Text decorations can include underlines, overlines, and line-through (strikethrough).
+/// Multiple decoration types can be combined using bitwise OR on the <see cref="ImpellerTextDecoration.Types"/> property.
+/// </remarks>
 public partial struct ImpellerTextDecoration
 {
     /// <summary>

@@ -53,6 +53,28 @@ public unsafe partial class ImpellerContext
         return res != null! ? new ImpellerContext(res) : null;
     }
 
+    /// <summary>
+    /// Retrieves Vulkan-specific information from a Vulkan rendering context.
+    /// </summary>
+    /// <returns>
+    /// An <see cref="ImpellerContextVulkanInfo"/> structure containing Vulkan handles and details.
+    /// </returns>
+    /// <exception cref="InvalidOperationException">
+    /// Thrown when called on a non-Vulkan context (Metal or OpenGL ES).
+    /// </exception>
+    /// <exception cref="ObjectDisposedException">
+    /// Thrown when called on a disposed context.
+    /// </exception>
+    /// <remarks>
+    /// <para>
+    /// This method can only be called on contexts created via <see cref="CreateVulkanNew"/>.
+    /// Calling it on Metal or OpenGL ES contexts will result in an exception.
+    /// </para>
+    /// <para>
+    /// The returned structure contains native Vulkan handles.
+    /// These handles can be used for advanced Vulkan interop scenarios but should be used with caution.
+    /// </para>
+    /// </remarks>
     public ImpellerContextVulkanInfo? GetVulkanInfo()
     {
         ImpellerContextVulkanInfo info;

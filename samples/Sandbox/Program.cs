@@ -4,11 +4,15 @@ using System;
 using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Runtime.Versioning;
 using NImpeller;
 using Sandbox;
 using Sandbox.Scenes;
 using Silk.NET.Core.Contexts;
 using Silk.NET.Core.Native;
+using SharpMetal.Metal;
+using SharpMetal.ObjectiveCCore;
+using Sandbox.MacInterop;
 
 static unsafe  class Program
 {
@@ -16,6 +20,7 @@ static unsafe  class Program
     {
         OpenGL,
         Vulkan,
+        Metal,
         DontTellMeThatThisIsUnreachable
     }
     
@@ -25,9 +30,45 @@ static unsafe  class Program
         Paragraph,
         CirclingSquares
     }
+
+    static NSWindow? _window;
     
     
     static void Main(string[] args)
+    {
+        // Parse command-line arguments
+        var apiType = GraphicsApi.OpenGL;
+        if(args.Length > 1)
+        {
+            if (args[1].Equals("vulkan", StringComparison.OrdinalIgnoreCase))
+                apiType = GraphicsApi.Vulkan;
+            else if (args[1].Equals("opengl", StringComparison.OrdinalIgnoreCase))
+                apiType = GraphicsApi.OpenGL;
+            else if (args[1].Equals("metal", StringComparison.OrdinalIgnoreCase))
+                apiType = GraphicsApi.Metal;
+        }
+
+        if (new Random().Next(10) > 100)
+            apiType = GraphicsApi.DontTellMeThatThisIsUnreachable;
+
+        // Check if Metal is requested and we're on macOS
+        if (apiType == GraphicsApi.Metal)
+        {
+            if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+            {
+                Console.WriteLine("Metal is only supported on macOS");
+                return;
+            }
+
+            RunMetalApp(args);
+            return;
+        }
+
+        // For OpenGL and Vulkan, use SDL
+        RunSdlApp(args, apiType);
+    }
+
+    static void RunSdlApp(string[] args, GraphicsApi apiType)
     {
         var sdl = Sdl.GetApi();
 
@@ -36,18 +77,6 @@ static unsafe  class Program
             Console.WriteLine($"SDL initialization failed: {sdl.GetErrorS()}");
             return;
         }
-
-        var apiType = GraphicsApi.OpenGL;
-        if(args.Length > 1)
-        {
-            if (args[1].Equals("vulkan", StringComparison.OrdinalIgnoreCase))
-                apiType = GraphicsApi.Vulkan;
-            else if (args[1].Equals("opengl", StringComparison.OrdinalIgnoreCase))
-                apiType = GraphicsApi.OpenGL;
-        }
-
-        if (new Random().Next(10) > 100)
-            apiType = GraphicsApi.DontTellMeThatThisIsUnreachable;
 
         if (apiType == GraphicsApi.OpenGL)
         {
@@ -135,7 +164,7 @@ static unsafe  class Program
         }
         else
         {
-            throw null!;
+            throw new NotSupportedException($"Unsupported API type: {apiType}");
         }
 
         
@@ -194,7 +223,7 @@ static unsafe  class Program
             }
             else
             {
-                throw null;
+                throw new NotSupportedException($"Unsupported API type: {apiType}");
             }
 
             //gl.Viewport(0, 0, (uint)width, (uint)height);
@@ -228,7 +257,7 @@ static unsafe  class Program
             {
                 if (apiType == GraphicsApi.OpenGL)
                 {
-                    surface.DrawDisplayList(displayList);
+                    surface?.DrawDisplayList(displayList);
                     sdl.GLSwapWindow(window);
                 }
                 else if (apiType == GraphicsApi.Vulkan)
@@ -250,40 +279,141 @@ static unsafe  class Program
         sdl.Quit();*/
     }
 
-    static (float r, float g, float b) HsvToRgb(float h, float s, float v)
+    [SupportedOSPlatform("macos")]
+    static void RunMetalApp(string[] args)
     {
-        float c = v * s;
-        float x = c * (1 - Math.Abs((h / 60.0f) % 2 - 1));
-        float m = v - c;
+        // Initialize Objective-C runtime, via SharpMetal
+        ObjectiveC.LinkMetal();
+        ObjectiveC.LinkCoreGraphics();
+        ObjectiveC.LinkAppKit();
+        ObjectiveC.LinkMetalKit();
 
-        float r = 0, g = 0, b = 0;
-
-        if (h >= 0 && h < 60)
+        Scenes sceneType = Scenes.MMark;
+        if (args.Length > 0)
         {
-            r = c; g = x; b = 0;
-        }
-        else if (h >= 60 && h < 120)
-        {
-            r = x; g = c; b = 0;
-        }
-        else if (h >= 120 && h < 180)
-        {
-            r = 0; g = c; b = x;
-        }
-        else if (h >= 180 && h < 240)
-        {
-            r = 0; g = x; b = c;
-        }
-        else if (h >= 240 && h < 300)
-        {
-            r = x; g = 0; b = c;
-        }
-        else
-        {
-            r = c; g = 0; b = x;
+            Enum.TryParse<Scenes>(args[0], true, out sceneType);
         }
 
-        return (r + m, g + m, b + m);
+        IScene scene = sceneType switch
+        {
+            Scenes.MMark => new MMarkScene(),
+            Scenes.Paragraph => new ParagraphScene(),
+            Scenes.CirclingSquares => new CirclingSquares(),
+            _ => new MMarkScene()
+        };
+
+        // Set up NSApplication
+        var nsApplication = new Sandbox.MacInterop.NSApplication();
+        var appDelegate = new Sandbox.MacInterop.NSApplicationDelegate(nsApplication);
+        nsApplication.SetDelegate(appDelegate);
+
+        var windowCreated = false;
+        appDelegate.OnApplicationDidFinishLaunching += notification =>
+        {
+            if (windowCreated) return;
+            windowCreated = true;
+
+            var rect = new NSRect(100, 100, 800, 600);
+            _window = new Sandbox.MacInterop.NSWindow(
+                rect,
+                (ulong)(Sandbox.MacInterop.NSStyleMask.Titled |
+                        Sandbox.MacInterop.NSStyleMask.Resizable |
+                        Sandbox.MacInterop.NSStyleMask.Closable |
+                        Sandbox.MacInterop.NSStyleMask.Miniaturizable));
+
+            var device = MTLDevice.CreateSystemDefaultDevice();
+
+            // Create MTKView with NImpeller renderer
+            var mtkView = new Sandbox.MacInterop.MTKView(rect, device)
+            {
+                ColorPixelFormat = MTLPixelFormat.BGRA8Unorm,
+                ClearColor = new MTLClearColor { red = 0.0, green = 0.0, blue = 0.0, alpha = 1.0 },
+                Delegate = Sandbox.MacInterop.MTKViewDelegate.Init<ImpellerRenderer>(device)
+            };
+
+            ImpellerRenderer.CurrentScene = scene;
+
+            _window.SetContentView(mtkView);
+            _window.Title = "NImpeller on Metal";
+            _window.MakeKeyAndOrderFront();
+
+            var app = new Sandbox.MacInterop.NSApplication(notification.Object);
+            app.ActivateIgnoringOtherApps(true);
+        };
+
+        appDelegate.OnApplicationWillFinishLaunching += notification =>
+        {
+            var app = new Sandbox.MacInterop.NSApplication(notification.Object);
+            app.SetActivationPolicy(Sandbox.MacInterop.NSApplicationActivationPolicy.Regular);
+        };
+
+        nsApplication.Run();
+    }
+
+    [SupportedOSPlatform("macos")]
+    class ImpellerRenderer : Sandbox.MacInterop.IRenderer
+    {
+        private readonly ImpellerContext _context;
+        private readonly Stopwatch _stopwatch;
+        private int _frames;
+        private int _fps;
+
+        public static IScene? CurrentScene { get; set; }
+
+        public ImpellerRenderer(MTLDevice device)
+        {
+            _context = ImpellerContext.CreateMetalNew()!;
+            _stopwatch = Stopwatch.StartNew();
+            _frames = 0;
+            _fps = 0;
+        }
+
+        public static Sandbox.MacInterop.IRenderer Init(MTLDevice device)
+        {
+            return new ImpellerRenderer(device);
+        }
+
+        public void Draw(Sandbox.MacInterop.MTKView view)
+        {
+            if (CurrentScene == null)
+                return;
+
+            var drawable = view.CurrentDrawable;
+            if (drawable.NativePtr == IntPtr.Zero)
+                return;
+
+            if (_stopwatch.Elapsed.TotalSeconds > 1)
+            {
+                _fps = (int)(_frames / _stopwatch.Elapsed.TotalSeconds);
+                _frames = 0;
+                _stopwatch.Restart();
+                _window!.Title = $"NImpeller on Metal - FPS: {_fps}";
+            }
+
+            _frames++;
+
+            var width = (int)drawable.Texture.Width;
+            var height = (int)drawable.Texture.Height;
+
+            ImpellerDisplayList displayList;
+            using (var drawListBuilder = ImpellerDisplayListBuilder.New(new ImpellerRect(0, 0, width, height))!)
+            {
+                CurrentScene.Render(_context, drawListBuilder, new SceneParameters()
+                {
+                    Width = width,
+                    Height = height
+                });
+
+                displayList = drawListBuilder.CreateDisplayListNew()!;
+            }
+
+            using (displayList)
+            {
+                using var surface = _context.SurfaceCreateWrappedMetalDrawableNew(drawable.NativePtr)!;
+                surface.DrawDisplayList(displayList);
+                drawable.Present();
+            }
+        }
     }
 }
 

@@ -13,6 +13,17 @@
             "stopAtEntry": false
         },
         {
+            "name": "Paragraph - Metal",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
+            "args": [ "paragraph", "metal" ],
+            "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
             "name": "Paragraph",
             "type": "coreclr",
             "request": "launch",
@@ -24,12 +35,34 @@
             "stopAtEntry": false
         },
         {
+            "name": "MMark - Metal",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
+            "args": [ "mmark", "metal" ],
+            "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
             "name": "MMark",
             "type": "coreclr",
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
             "args": [ "mmark" ],
+            "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
+            "console": "internalConsole",
+            "stopAtEntry": false
+        },
+        {
+            "name": "Circling Squares - Metal",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
+            "args": [ "circlingsquares", "metal" ],
             "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
             "console": "internalConsole",
             "stopAtEntry": false

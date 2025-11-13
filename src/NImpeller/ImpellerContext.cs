@@ -53,6 +53,12 @@ public unsafe partial class ImpellerContext
         return res != null! ? new ImpellerContext(res) : null;
     }
 
+    public static ImpellerContext? CreateMetalNew()
+    {
+        var res = UnsafeNativeMethods.ImpellerContextCreateMetalNew(UnsafeNativeMethods.ImpellerVersion);
+        return res != null! ? new ImpellerContext(res) : null;
+    }
+
     public ImpellerContextVulkanInfo? GetVulkanInfo()
     {
         ImpellerContextVulkanInfo info;

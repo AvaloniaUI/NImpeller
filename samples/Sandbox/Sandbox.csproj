@@ -21,6 +21,8 @@
 
     <ItemGroup>
       <ProjectReference Include="../Sandbox.Core/Sandbox.Core.csproj" />
+      <ProjectReference Include="../Sandbox.Metal/Sandbox.Metal.csproj" />
+      <ProjectReference Include="../Sandbox.SDL/Sandbox.SDL.csproj" />
       <ProjectReference Include="..\..\src\NImpeller\NImpeller.csproj" />
     </ItemGroup>
 

@@ -15,7 +15,13 @@ static class Program
 
     private static readonly string[] AllApis = ["OpenGL", "Vulkan", "Metal"];
     private static readonly string[] NonMetalApis = ["OpenGL", "Vulkan"];
-    private static readonly string[] SceneNames = ["MMark", "Paragraph", "Circling Squares"];
+
+    private static readonly IScene[] AvailableScenes =
+    [
+        new MMarkScene(),
+        new ParagraphScene(),
+        new CirclingSquares()
+    ];
 
     public enum GraphicsApi
     {
@@ -102,16 +108,17 @@ static class Program
 
         // Select Scene
         var selectedScene = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
+            new SelectionPrompt<IScene>()
                 .Title("[green]Select Scene:[/]")
                 .PageSize(10)
-                .AddChoices(SceneNames));
+                .UseConverter(scene => $"{scene.Name} - [dim]{scene.Description}[/]")
+                .AddChoices(AvailableScenes));
 
         var scene = selectedScene switch
         {
-            "MMark" => SceneType.MMark,
-            "Paragraph" => SceneType.Paragraph,
-            "Circling Squares" => SceneType.CirclingSquares,
+            MMarkScene => SceneType.MMark,
+            ParagraphScene => SceneType.Paragraph,
+            CirclingSquares => SceneType.CirclingSquares,
             _ => SceneType.MMark
         };
 
@@ -132,7 +139,7 @@ static class Program
                     ? ValidationResult.Success()
                     : ValidationResult.Error("[red]Height must be between 1 and 4096[/]")));
 
-        AnsiConsole.MarkupLine($"\n[cyan]Starting {selectedApi} with {selectedScene} scene ({width}x{height})...[/]\n");
+        AnsiConsole.MarkupLine($"\n[cyan]Starting {selectedApi} with {selectedScene.Name} scene ({width}x{height})...[/]\n");
 
         return new Options
         {

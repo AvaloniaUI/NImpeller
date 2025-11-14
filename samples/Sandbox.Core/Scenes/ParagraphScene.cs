@@ -8,6 +8,9 @@ namespace Sandbox.Scenes;
 
 public class ParagraphScene : IScene
 {
+    public string Name => "Paragraph";
+    public string Description => "Typography showcase with various font sizes, weights, alignments, decorations, and CJK text rendering";
+
     Stopwatch st = Stopwatch.StartNew();
     public void Render(ImpellerContext context, ImpellerDisplayListBuilder scene, SceneParameters sceneParameters)
     {

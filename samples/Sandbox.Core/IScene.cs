@@ -11,5 +11,15 @@ public class SceneParameters
 
 public interface IScene
 {
+    /// <summary>
+    /// Gets the name of the scene.
+    /// </summary>
+    string Name { get; }
+
+    /// <summary>
+    /// Gets a description of what the scene demonstrates.
+    /// </summary>
+    string Description { get; }
+
     void Render(ImpellerContext context, ImpellerDisplayListBuilder scene, SceneParameters sceneParameters);
 }

@@ -15,6 +15,8 @@ public class MetalApplication : IApplication
 
     private NSWindow? _window;
     private NSWindowDelegate? _windowDelegate;
+    private NSApplicationDelegate? _appDelegate;
+    private MTKViewDelegate? _mtkViewDelegate;
     private IScene _scene = null!;
     private readonly ILogger<MetalApplication> _logger;
 
@@ -56,11 +58,11 @@ public class MetalApplication : IApplication
 
         // Set up NSApplication
         var nsApplication = new NSApplication();
-        var appDelegate = new NSApplicationDelegate(nsApplication);
-        nsApplication.SetDelegate(appDelegate);
+        _appDelegate = new NSApplicationDelegate(nsApplication);
+        nsApplication.SetDelegate(_appDelegate);
 
         var windowCreated = false;
-        appDelegate.OnApplicationDidFinishLaunching += notification =>
+        _appDelegate.OnApplicationDidFinishLaunching += notification =>
         {
             if (windowCreated) return;
             windowCreated = true;
@@ -76,11 +78,13 @@ public class MetalApplication : IApplication
             var device = MTLDevice.CreateSystemDefaultDevice();
 
             // Create MTKView with NImpeller renderer
+            // Store the delegate in a field to prevent GC collection
+            _mtkViewDelegate = MTKViewDelegate.Init<ImpellerMetalRenderer>(device, _logger);
             var mtkView = new MTKView(rect, device)
             {
                 ColorPixelFormat = MTLPixelFormat.BGRA8Unorm,
                 ClearColor = new MTLClearColor { red = 0.0, green = 0.0, blue = 0.0, alpha = 1.0 },
-                Delegate = MTKViewDelegate.Init<ImpellerMetalRenderer>(device, _logger)
+                Delegate = _mtkViewDelegate
             };
 
             ImpellerMetalRenderer.CurrentScene = _scene;
@@ -106,7 +110,7 @@ public class MetalApplication : IApplication
             app.ActivateIgnoringOtherApps(true);
         };
 
-        appDelegate.OnApplicationWillFinishLaunching += notification =>
+        _appDelegate.OnApplicationWillFinishLaunching += notification =>
         {
             var app = new NSApplication(notification.Object);
             app.SetActivationPolicy(NSApplicationActivationPolicy.Regular);

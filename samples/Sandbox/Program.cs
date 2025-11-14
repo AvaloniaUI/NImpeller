@@ -12,6 +12,11 @@ using Sandbox.Scenes;
 static class Program
 {
     private static ILoggerFactory? _loggerFactory;
+
+    private static readonly string[] AllApis = ["OpenGL", "Vulkan", "Metal"];
+    private static readonly string[] NonMetalApis = ["OpenGL", "Vulkan"];
+    private static readonly string[] SceneNames = ["MMark", "Paragraph", "Circling Squares"];
+
     public enum GraphicsApi
     {
         OpenGL,
@@ -51,10 +56,91 @@ static class Program
                 .SetMinimumLevel(LogLevel.Debug);
         });
 
+        // If no arguments provided, show interactive menu
+        if (args.Length == 0)
+        {
+            var options = ShowInteractiveMenu();
+            if (options != null)
+            {
+                RunApplication(options);
+            }
+            return;
+        }
+
         var parser = new Parser(with => with.CaseInsensitiveEnumValues = true);
         parser.ParseArguments<Options>(args)
             .WithParsed(RunApplication)
             .WithNotParsed(errors => Environment.Exit(1));
+    }
+
+    static Options? ShowInteractiveMenu()
+    {
+        AnsiConsole.Clear();
+        AnsiConsole.Write(
+            new FigletText("NImpeller Sandbox")
+                .LeftJustified()
+                .Color(Color.Blue));
+
+        AnsiConsole.MarkupLine("[dim]A .NET binding for Flutter's Impeller graphics engine[/]\n");
+
+        // Select Graphics API
+        var availableApis = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? AllApis : NonMetalApis;
+
+        var selectedApi = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("[green]Select Graphics API:[/]")
+                .PageSize(10)
+                .AddChoices(availableApis));
+
+        var api = selectedApi switch
+        {
+            "OpenGL" => GraphicsApi.OpenGL,
+            "Vulkan" => GraphicsApi.Vulkan,
+            "Metal" => GraphicsApi.Metal,
+            _ => GraphicsApi.OpenGL
+        };
+
+        // Select Scene
+        var selectedScene = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("[green]Select Scene:[/]")
+                .PageSize(10)
+                .AddChoices(SceneNames));
+
+        var scene = selectedScene switch
+        {
+            "MMark" => SceneType.MMark,
+            "Paragraph" => SceneType.Paragraph,
+            "Circling Squares" => SceneType.CirclingSquares,
+            _ => SceneType.MMark
+        };
+
+        // Get window dimensions
+        var width = AnsiConsole.Prompt(
+            new TextPrompt<int>("[green]Window width:[/]")
+                .DefaultValue(800)
+                .ValidationErrorMessage("[red]Please enter a valid number[/]")
+                .Validate(w => w > 0 && w <= 4096
+                    ? ValidationResult.Success()
+                    : ValidationResult.Error("[red]Width must be between 1 and 4096[/]")));
+
+        var height = AnsiConsole.Prompt(
+            new TextPrompt<int>("[green]Window height:[/]")
+                .DefaultValue(600)
+                .ValidationErrorMessage("[red]Please enter a valid number[/]")
+                .Validate(h => h > 0 && h <= 4096
+                    ? ValidationResult.Success()
+                    : ValidationResult.Error("[red]Height must be between 1 and 4096[/]")));
+
+        AnsiConsole.MarkupLine($"\n[cyan]Starting {selectedApi} with {selectedScene} scene ({width}x{height})...[/]\n");
+
+        return new Options
+        {
+            Api = api,
+            Scene = scene,
+            Width = width,
+            Height = height
+        };
     }
 
     static void RunApplication(Options options)

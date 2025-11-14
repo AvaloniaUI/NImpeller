@@ -1,6 +1,5 @@
-﻿using System;
+﻿using System.Linq;
 using System.Runtime.InteropServices;
-using System.Runtime.Versioning;
 using System.Threading;
 using System.Threading.Tasks;
 using CommandLine;
@@ -30,20 +29,13 @@ static class Program
         Metal
     }
 
-    public enum SceneType
-    {
-        MMark,
-        Paragraph,
-        CirclingSquares
-    }
-
     public class Options
     {
         [Option('a', "api", Required = false, Default = GraphicsApi.OpenGL, HelpText = "Graphics API to use (OpenGL, Vulkan, Metal)")]
         public GraphicsApi Api { get; set; }
 
-        [Option('s', "scene", Required = false, Default = SceneType.MMark, HelpText = "Scene to render (MMark, Paragraph, CirclingSquares)")]
-        public SceneType Scene { get; set; }
+        [Option('s', "scene", Required = false, Default = "MMark", HelpText = "Scene to render. Available scenes: MMark, Paragraph, CirclingSquares")]
+        public string Scene { get; set; } = "MMark";
 
         [Option('w', "width", Required = false, Default = 800, HelpText = "Window width")]
         public int Width { get; set; }
@@ -114,14 +106,6 @@ static class Program
                 .UseConverter(scene => $"{scene.Name} - [dim]{scene.Description}[/]")
                 .AddChoices(AvailableScenes));
 
-        var scene = selectedScene switch
-        {
-            MMarkScene => SceneType.MMark,
-            ParagraphScene => SceneType.Paragraph,
-            CirclingSquares => SceneType.CirclingSquares,
-            _ => SceneType.MMark
-        };
-
         // Get window dimensions
         var width = AnsiConsole.Prompt(
             new TextPrompt<int>("[green]Window width:[/]")
@@ -144,24 +128,30 @@ static class Program
         return new Options
         {
             Api = api,
-            Scene = scene,
+            Scene = selectedScene.Name,
             Width = width,
             Height = height
         };
+    }
+
+    static IScene? GetSceneByName(string sceneName)
+    {
+        return AvailableScenes.FirstOrDefault(s =>
+            s.Name.Equals(sceneName, StringComparison.OrdinalIgnoreCase));
     }
 
     static void RunApplication(Options options)
     {
         var logger = _loggerFactory!.CreateLogger("Sandbox");
 
-        // Create the scene based on the selected type
-        IScene scene = options.Scene switch
+        // Get the scene based on the selected name
+        var scene = GetSceneByName(options.Scene);
+        if (scene == null)
         {
-            SceneType.MMark => new MMarkScene(),
-            SceneType.Paragraph => new ParagraphScene(),
-            SceneType.CirclingSquares => new CirclingSquares(),
-            _ => new MMarkScene()
-        };
+            var availableScenes = string.Join(", ", AvailableScenes.Select(s => s.Name));
+            logger.LogError("Unknown scene: {Scene}. Available scenes: {AvailableScenes}", options.Scene, availableScenes);
+            return;
+        }
 
         // Check if Metal is requested and we're on macOS
         if (options.Api == GraphicsApi.Metal)

@@ -11,5 +11,10 @@
   <ItemGroup>
     <PackageReference Include="SharpMetal" Version="1.1.0" />
   </ItemGroup>
-  
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/NImpeller/NImpeller.csproj" />
+    <ProjectReference Include="../Sandbox.Core/Sandbox.Core.csproj" />
+  </ItemGroup>
+
 </Project>

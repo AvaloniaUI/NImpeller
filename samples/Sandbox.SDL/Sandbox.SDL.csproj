@@ -15,4 +15,9 @@
     <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.22.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="../../src/NImpeller/NImpeller.csproj" />
+    <ProjectReference Include="../Sandbox.Core/Sandbox.Core.csproj" />
+  </ItemGroup>
+
 </Project>

@@ -20,6 +20,10 @@
     </ItemGroup>
 
     <ItemGroup>
+      <PackageReference Include="CommandLineParser" Version="2.9.1" />
+    </ItemGroup>
+
+    <ItemGroup>
       <ProjectReference Include="../Sandbox.Core/Sandbox.Core.csproj" />
       <ProjectReference Include="../Sandbox.Metal/Sandbox.Metal.csproj" />
       <ProjectReference Include="../Sandbox.SDL/Sandbox.SDL.csproj" />

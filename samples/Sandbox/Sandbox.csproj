@@ -9,17 +9,15 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="Silk.NET.OpenGLES" Version="2.22.0" />
-      <PackageReference Include="Silk.NET.SDL" Version="2.22.0" />
-      <PackageReference Include="Silk.NET.Vulkan" Version="2.22.0" />
-      <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.22.0" />
+      <PackageReference Include="CommandLineParser" Version="2.9.1" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
+      <PackageReference Include="Spectre.Console" Version="0.54.0" />
     </ItemGroup>
 
     <ItemGroup>
-      <PackageReference Include="SharpMetal" Version="1.1.0" />
-    </ItemGroup>
-
-    <ItemGroup>
+      <ProjectReference Include="../Sandbox.Core/Sandbox.Core.csproj" />
+      <ProjectReference Include="../Sandbox.Metal/Sandbox.Metal.csproj" />
+      <ProjectReference Include="../Sandbox.SDL/Sandbox.SDL.csproj" />
       <ProjectReference Include="..\..\src\NImpeller\NImpeller.csproj" />
     </ItemGroup>
 

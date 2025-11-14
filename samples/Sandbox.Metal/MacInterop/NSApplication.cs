@@ -28,6 +28,11 @@ namespace Sandbox.MacInterop
             ObjectiveC.objc_msgSend(NativePtr, "stop:", IntPtr.Zero);
         }
 
+        public void Terminate()
+        {
+            ObjectiveC.objc_msgSend(NativePtr, "terminate:", IntPtr.Zero);
+        }
+
         public void ActivateIgnoringOtherApps(bool flag)
         {
             ObjectiveC.objc_msgSend(NativePtr, "activateIgnoringOtherApps:", flag);

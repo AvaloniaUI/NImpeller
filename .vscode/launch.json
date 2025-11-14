@@ -18,7 +18,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
-            "args": [ "paragraph", "metal" ],
+            "args": [ "--scene", "paragraph", "--api", "metal" ],
             "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
             "console": "internalConsole",
             "stopAtEntry": false
@@ -29,7 +29,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
-            "args": [ "paragraph" ],
+            "args": [ "--scene", "paragraph" ],
             "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
             "console": "internalConsole",
             "stopAtEntry": false
@@ -40,7 +40,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
-            "args": [ "mmark", "metal" ],
+            "args": [ "--scene", "mmark", "--api", "metal" ],
             "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
             "console": "internalConsole",
             "stopAtEntry": false
@@ -51,7 +51,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
-            "args": [ "mmark" ],
+            "args": [ "--scene", "mmark" ],
             "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
             "console": "internalConsole",
             "stopAtEntry": false
@@ -62,7 +62,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
-            "args": [ "circlingsquares", "metal" ],
+            "args": [ "--scene", "circlingsquares", "--api", "metal" ],
             "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
             "console": "internalConsole",
             "stopAtEntry": false
@@ -73,7 +73,7 @@
             "request": "launch",
             "preLaunchTask": "build",
             "program": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/Sandbox.dll",
-            "args": [ "circlingsquares" ],
+            "args": [ "--scene", "circlingsquares" ],
             "cwd": "${workspaceFolder}/samples/Sandbox/bin/Debug/net8.0/",
             "console": "internalConsole",
             "stopAtEntry": false

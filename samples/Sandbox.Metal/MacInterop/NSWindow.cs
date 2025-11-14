@@ -30,6 +30,11 @@ namespace Sandbox.MacInterop
         {
             ObjectiveC.objc_msgSend(NativePtr, "makeKeyAndOrderFront:", IntPtr.Zero);
         }
+
+        public void SetDelegate(IntPtr delegatePtr)
+        {
+            ObjectiveC.objc_msgSend(NativePtr, "setDelegate:", delegatePtr);
+        }
     }
 
     [SupportedOSPlatform("macos")]

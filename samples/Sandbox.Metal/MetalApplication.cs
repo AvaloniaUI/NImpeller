@@ -1,4 +1,6 @@
 using System.Runtime.Versioning;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NImpeller;
 using Sandbox.MacInterop;
 using SharpMetal.Metal;
@@ -11,6 +13,12 @@ public class MetalApplication
 {
     private NSWindow? _window;
     private IScene _scene = null!;
+    private readonly ILogger<MetalApplication> _logger;
+
+    public MetalApplication(ILogger<MetalApplication>? logger = null)
+    {
+        _logger = logger ?? NullLogger<MetalApplication>.Instance;
+    }
 
     public void SetScene(IScene scene)
     {
@@ -51,7 +59,7 @@ public class MetalApplication
             {
                 ColorPixelFormat = MTLPixelFormat.BGRA8Unorm,
                 ClearColor = new MTLClearColor { red = 0.0, green = 0.0, blue = 0.0, alpha = 1.0 },
-                Delegate = MTKViewDelegate.Init<ImpellerMetalRenderer>(device)
+                Delegate = MTKViewDelegate.Init<ImpellerMetalRenderer>(device, _logger)
             };
 
             ImpellerMetalRenderer.CurrentScene = _scene;

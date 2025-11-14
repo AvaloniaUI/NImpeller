@@ -3,6 +3,8 @@ using Silk.NET.OpenGLES;
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using NImpeller;
 using Silk.NET.Core.Contexts;
 using Silk.NET.Core.Native;
@@ -29,19 +31,21 @@ public unsafe class SdlApplication
     private readonly Stopwatch _stopwatch;
     private int _frames;
     private int _fps;
+    private readonly ILogger<SdlApplication> _logger;
 
-    public SdlApplication(GraphicsApi apiType = GraphicsApi.OpenGL)
+    public SdlApplication(GraphicsApi apiType = GraphicsApi.OpenGL, ILogger<SdlApplication>? logger = null)
     {
         _sdl = Sdl.GetApi();
         _apiType = apiType;
         _stopwatch = Stopwatch.StartNew();
+        _logger = logger ?? NullLogger<SdlApplication>.Instance;
     }
 
     public bool Initialize(int width = 1600, int height = 900, string title = "NImpeller on SDL")
     {
         if (_sdl.Init(Sdl.InitVideo) < 0)
         {
-            Console.WriteLine($"SDL initialization failed: {_sdl.GetErrorS()}");
+            _logger.LogError("SDL initialization failed: {Error}", _sdl.GetErrorS());
             return false;
         }
 
@@ -79,7 +83,7 @@ public unsafe class SdlApplication
 
         if (_window == null)
         {
-            Console.WriteLine($"Window creation failed: {_sdl.GetErrorS()}");
+            _logger.LogError("Window creation failed: {Error}", _sdl.GetErrorS());
             _sdl.Quit();
             return false;
         }
@@ -89,7 +93,7 @@ public unsafe class SdlApplication
             var context = _sdl.GLCreateContext(_window);
             if (context == null)
             {
-                Console.WriteLine($"OpenGL context creation failed: {_sdl.GetErrorS()}");
+                _logger.LogError("OpenGL context creation failed: {Error}", _sdl.GetErrorS());
                 _sdl.DestroyWindow(_window);
                 _sdl.Quit();
                 return false;
@@ -101,7 +105,7 @@ public unsafe class SdlApplication
             _sdl.GLSetSwapInterval(0);
             _impellerContext = ImpellerContext.CreateOpenGLESNew(name =>
             {
-                Console.WriteLine(name);
+                _logger.LogDebug("Loading OpenGL function: {FunctionName}", name);
                 return (IntPtr)_sdl.GLGetProcAddress(name);
             })!;
             int fbo = 0;

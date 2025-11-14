@@ -1,11 +1,13 @@
 ﻿using System;
 using System.Runtime.InteropServices;
 using CommandLine;
+using Microsoft.Extensions.Logging;
 using Sandbox;
 using Sandbox.Scenes;
 
 static class Program
 {
+    private static ILoggerFactory? _loggerFactory;
     public enum GraphicsApi
     {
         OpenGL,
@@ -37,6 +39,14 @@ static class Program
 
     static void Main(string[] args)
     {
+        // Configure logging
+        _loggerFactory = LoggerFactory.Create(builder =>
+        {
+            builder
+                .AddDebug()
+                .SetMinimumLevel(LogLevel.Debug);
+        });
+
         var parser = new Parser(with => with.CaseInsensitiveEnumValues = true);
         parser.ParseArguments<Options>(args)
             .WithParsed(RunApplication)
@@ -45,6 +55,8 @@ static class Program
 
     static void RunApplication(Options options)
     {
+        var logger = _loggerFactory!.CreateLogger("Sandbox");
+
         // Create the scene based on the selected type
         IScene scene = options.Scene switch
         {
@@ -59,11 +71,12 @@ static class Program
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             {
-                Console.WriteLine("Metal is only supported on macOS");
+                logger.LogError("Metal is only supported on macOS");
                 return;
             }
 
-            var metalApp = new MetalApplication();
+            var metalLogger = _loggerFactory!.CreateLogger<MetalApplication>();
+            var metalApp = new MetalApplication(metalLogger);
             metalApp.SetScene(scene);
             metalApp.Run(options.Width, options.Height);
             return;
@@ -71,7 +84,8 @@ static class Program
 
         // For OpenGL and Vulkan, use SDL
         var sdlApi = options.Api == GraphicsApi.OpenGL ? SdlApplication.GraphicsApi.OpenGL : SdlApplication.GraphicsApi.Vulkan;
-        var sdlApp = new SdlApplication(sdlApi);
+        var sdlLogger = _loggerFactory!.CreateLogger<SdlApplication>();
+        var sdlApp = new SdlApplication(sdlApi, sdlLogger);
         if (sdlApp.Initialize(options.Width, options.Height))
         {
             sdlApp.SetScene(scene);

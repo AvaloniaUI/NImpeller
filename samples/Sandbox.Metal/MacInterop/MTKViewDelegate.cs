@@ -1,6 +1,8 @@
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.Marshalling;
 using System.Runtime.Versioning;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SharpMetal.Metal;
 using SharpMetal.ObjectiveCCore;
 
@@ -9,6 +11,7 @@ namespace Sandbox.MacInterop
     [SupportedOSPlatform("macos")]
     public class MTKViewDelegate
     {
+        private static ILogger? _logger;
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
         private delegate void OnDrawInMTKViewDelegate(IntPtr id, IntPtr cmd, IntPtr view);
 
@@ -24,10 +27,14 @@ namespace Sandbox.MacInterop
         public IntPtr NativePtr;
         public static implicit operator IntPtr(MTKViewDelegate mtkDelegate) => mtkDelegate.NativePtr;
 
-        public unsafe MTKViewDelegate(IRenderer renderer)
+        public unsafe MTKViewDelegate(IRenderer renderer, ILogger? logger = null)
         {
+            _logger = logger;
             OnDrawInMTKView += renderer.Draw;
-            OnMTKViewDrawableSizeWillChange += (view, rect) => { Console.WriteLine("MTKView Changed Size!"); };
+            OnMTKViewDrawableSizeWillChange += (view, rect) =>
+            {
+                (_logger ?? NullLogger.Instance).LogDebug("MTKView Changed Size: {Width}x{Height}", rect.Size.X, rect.Size.Y);
+            };
 
             var name = Utf8StringMarshaller.ConvertToUnmanaged("MTKViewDelegate");
             var types1 = Utf8StringMarshaller.ConvertToUnmanaged("v@:#");
@@ -49,10 +56,10 @@ namespace Sandbox.MacInterop
             NativePtr = new ObjectiveCClass(mtkDelegateClass).AllocInit();
         }
 
-        public static MTKViewDelegate Init<T>(MTLDevice device) where T : IRenderer
+        public static MTKViewDelegate Init<T>(MTLDevice device, ILogger? logger = null) where T : IRenderer
         {
             var renderer = T.Init(device);
-            return new MTKViewDelegate(renderer);
+            return new MTKViewDelegate(renderer, logger);
         }
     }
 }

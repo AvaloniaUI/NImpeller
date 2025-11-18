@@ -88,7 +88,7 @@ class Generator
                 return res != null;
             }
 
-            string MapInteropType(NativeType type, bool allowHandles, bool allowStrings)
+            string MapInteropType(NativeType type, bool allowHandles, bool allowStrings, bool outHint)
             {
                 if (TryMapCommonType(type, allowStrings, out var common))
                     return common;
@@ -99,13 +99,15 @@ class Generator
                     return $"{gns}.{handle.Name}Handle";
                 }
                 if (type is NativeNullableType nt)
-                    return MapInteropType(nt.ElementType, allowHandles, allowStrings); //TODO?
+                    return MapInteropType(nt.ElementType, allowHandles, allowStrings, false); //TODO?
                 
                 if (type is NativePointerType pt)
                 {
                     if(allowStrings && pt.IsString)
                         return "string";
-                    return MapInteropType(pt.ElementType, false, false) + new string('*', pt.Level);
+                    if (pt.Level == 1 && outHint)
+                        return "out " + MapInteropType(pt.ElementType, false, allowStrings, false);
+                    return MapInteropType(pt.ElementType, false, false, false) + new string('*', pt.Level);
                 }
 
                 if (type is NativeFunctionPointer)
@@ -129,12 +131,12 @@ class Generator
                     {
                         if (m.Type is NativeFixedArray arr)
                         {
-                            var arrType = MapInteropType(arr.ElementType, false, false);
+                            var arrType = MapInteropType(arr.ElementType, false, false, false);
                             gen.Line("public fixed " + arrType + " " + m.Name + "[" + arr.Size + "];");
                         }
                         else
                         {
-                            var t = MapInteropType(m.Type, false, false);
+                            var t = MapInteropType(m.Type, false, false, false);
                             using (gen.Line($"private {t} _{m.Name};")
                                        .Line($"public {t} {Pascal(m.Name)}")
                                        .Scope())
@@ -171,10 +173,10 @@ class Generator
                     else
                     {
                         var line = "public static partial " + MapInteropType(imp.ReturnType, imp.Name.EndsWith("New"),
-                                                                true)
+                                                                true, false)
                                                             + " " + imp.Name + "(" + string.Join(", ",
                                                                 imp.Parameters.Select(p =>
-                                                                    MapInteropType(p.Type, true, true) + " " +
+                                                                    MapInteropType(p.Type, true, true, p.Name.StartsWith("out_")) + " " +
                                                                     p.Name)) + ");";
                         gen.Line(line);
                     }
@@ -184,7 +186,7 @@ class Generator
             }
             
 
-            string MapDotnetType(NativeType type, bool allowHandles)
+            string MapDotnetType(NativeType type, bool allowHandles, bool outHint)
             {
                 if (type is NativePointerType { ElementType: NativeStruct ns, Level: 1 } &&
                     manualMarshal.TryGetValue(ns.Name, out var marshalled))
@@ -202,14 +204,14 @@ class Generator
                 if(type.IsGenericDataPointer)
                     throw new UseManualInteropException();
                 if (type is NativeNullableType nt)
-                    return MapDotnetType(nt.ElementType, allowHandles) + "?";
+                    return MapDotnetType(nt.ElementType, allowHandles, false) + "?";
                 if (type is NativePointerType pt)
                 {
                     if (pt.Level != 1)
                         throw new UseManualInteropException();
                     if(pt.IsString)
                         return "string";
-                    return MapDotnetType(pt.ElementType, false);
+                    return (outHint ? "out " : "") + MapDotnetType(pt.ElementType, false, false);
                 }
 
                 if (type is NativeFunctionPointer)
@@ -252,9 +254,9 @@ class Generator
                             if (!isFactory)
                                 args.RemoveAt(0);
                             
-                            var retType = MapDotnetType(f.ReturnType, true);
+                            var retType = MapDotnetType(f.ReturnType, true, false);
                             var decl = $"{retType} {name}(" +
-                                       string.Join(", ", args.Select(p => MapDotnetType(p.Type, true) + " " + p.Name)) +
+                                       string.Join(", ", args.Select(p => MapDotnetType(p.Type, true, p.Name.StartsWith("out_")) + " " + p.Name.Replace("out_", ""))) +
                                        ")";
                             if (isFactory)
                                 decl = "static " + decl;
@@ -283,7 +285,7 @@ class Generator
                                         invocation += $"__marshal_{a.Name}.Value";
                                     }
                                     else if (a.Type is NativePointerType { IsString: false, Level: 1, IsGenericDataPointer: false, IsVoidPtr: false })
-                                        invocation += $"&{a.Name}";
+                                        invocation += a.Name.StartsWith("out_") ? $"out {a.Name.Replace("out_", "")}" : $"&{a.Name}";
                                     else
                                         invocation += a.Name;
 

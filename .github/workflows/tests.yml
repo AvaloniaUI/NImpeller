@@ -39,6 +39,12 @@ jobs:
             libsdl2-2.0-0 \
             libegl1 libgles2 libglvnd0 \
             libegl-mesa0 libgl1-mesa-dri libglx-mesa0
+          # Silk.NET.SDL dlopens "libSDL2-2.0.so", but the runtime package only ships
+          # "libSDL2-2.0.so.0" (the unversioned symlink lives in libsdl2-dev). Create it.
+          SO=$(ldconfig -p | awk '/libSDL2-2.0.so.0/{print $NF; exit}')
+          echo "Linking libSDL2-2.0.so -> $SO"
+          sudo ln -sf "$SO" "$(dirname "$SO")/libSDL2-2.0.so"
+          sudo ldconfig
 
       # Bindings (src/NImpeller/Generated/Bindings.g.cs) and the native libimpeller.so are not
       # committed; download the Linux SDK at the latest Flutter engine commit and generate them.

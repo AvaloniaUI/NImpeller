@@ -16,6 +16,8 @@
       <LIBGL_ALWAYS_SOFTWARE>1</LIBGL_ALWAYS_SOFTWARE>
       <GALLIUM_DRIVER>llvmpipe</GALLIUM_DRIVER>
       <MESA_LOADER_DRIVER_OVERRIDE>llvmpipe</MESA_LOADER_DRIVER_OVERRIDE>
+      <!-- A GLES context on X11/Xvfb must come through EGL (GLX is desktop-GL only). -->
+      <SDL_VIDEO_X11_FORCE_EGL>1</SDL_VIDEO_X11_FORCE_EGL>
     </EnvironmentVariables>
   </RunConfiguration>
 </RunSettings>

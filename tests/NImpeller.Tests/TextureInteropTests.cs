@@ -3,12 +3,6 @@ using Xunit;
 
 namespace NImpeller.Tests;
 
-/// <summary>
-/// GL-texture interop: create a real GL texture, adopt it into an ImpellerTexture, draw it, and
-/// read the result back. Mirrors Flutter's interop CanCreateOpenGLImage (handle round-trip) and
-/// CanDrawImage. This is the texture path that works today — unlike TextureCreateWithContentsNew,
-/// which is blocked by the unimplemented ImpellerMapping marshaller (see BindingGapTests).
-/// </summary>
 [Collection(ImpellerGLCollection.Name)]
 public sealed class TextureInteropTests
 {
@@ -22,10 +16,7 @@ public sealed class TextureInteropTests
     [Fact]
     public void GL_texture_round_trips_and_draws()
     {
-        Assert.SkipUnless(_gl.Available,
-            $"No headless GL context (run under xvfb-run or set SDL_VIDEODRIVER=offscreen). Reason: {_gl.Error}");
-        Assert.True(_gl.IsSoftwareRenderer,
-            $"Expected a software renderer (llvmpipe) but got '{_gl.RendererName}'. Ensure test.runsettings is applied. See README.");
+        RenderGate.Require(_gl);
 
         var (image, createdHandle, reportedHandle) = _gl.RenderTextureInterop(320, 240);
 

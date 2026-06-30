@@ -18,7 +18,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (with CppAst.NET submodule)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -47,6 +47,19 @@ jobs:
           chmod +x ./build.sh
           ./build.sh DownloadLatestImpeller --platform linux-x64
           ./build.sh GenerateBindings --platform linux-x64
+
+      # Prints what GL/EGL stack the runner actually exposes (helps diagnose context failures).
+      - name: GL diagnostics
+        continue-on-error: true
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GALLIUM_DRIVER: llvmpipe
+          __EGL_VENDOR_LIBRARY_FILENAMES: /usr/share/glvnd/egl_vendor.d/50_mesa.json
+        run: |
+          sudo apt-get install -y --no-install-recommends mesa-utils mesa-utils-extra || true
+          ls -l /usr/share/glvnd/egl_vendor.d/ || true
+          echo "== eglinfo =="; xvfb-run -a eglinfo 2>&1 | head -60 || true
+          echo "== glxinfo -B =="; xvfb-run -a glxinfo -B 2>&1 | head -25 || true
 
       - name: Test
         run: xvfb-run -a dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj -c Release

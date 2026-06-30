@@ -54,13 +54,7 @@ public sealed class GoldenImageTests
     [MemberData(nameof(SceneNames))]
     public void Scene_matches_golden(string sceneName)
     {
-        Assert.SkipUnless(_gl.Available,
-            $"No headless GL context (run under xvfb-run or set SDL_VIDEODRIVER=offscreen). Reason: {_gl.Error}");
-
-        // For now, we're only running on a software renderer
-        // so check if llvmpipe is being used.
-        Assert.True(_gl.IsSoftwareRenderer,
-            $"Expected a software renderer (llvmpipe) but got '{_gl.RendererName}'. Ensure test.runsettings is applied (it is by default via dotnet test). See README.");
+        RenderGate.Require(_gl);
 
         var @case = Cases[sceneName];
         var actual = _gl.Render(@case.Scene, @case.Width, @case.Height);
@@ -90,6 +84,11 @@ internal static class GoldenAssert
 
         if (update || !File.Exists(rawPath))
         {
+            if (!update && RenderGate.IsCI)
+            {
+                Assert.Fail($"Golden baseline not found in CI: {Path.GetFullPath(rawPath)} — it must be committed.");
+            }
+
             actual.SaveRaw(rawPath);
             actual.SavePng(Path.Combine(GoldensDir(), name + ".png"));
             Assert.Skip(update

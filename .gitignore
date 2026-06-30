@@ -6,3 +6,4 @@ riderModule.iml
 .idea
 external/impeller_sdk
 .DS_Store
+.nuke/temp/

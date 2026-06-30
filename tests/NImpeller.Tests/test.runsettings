@@ -1,14 +1,4 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Forces software (Mesa/llvmpipe) OpenGL ES for the test host process. These env vars must be set
-  before the GL/EGL vendor library loads, which only works if they're on the process environment
-  at launch — hence runsettings rather than setting them in code. Applied automatically via
-  <RunSettingsFilePath> in NImpeller.Tests.csproj, so a plain `dotnet test` uses software GL.
-
-  Why software GL: (1) deterministic golden images across machines; (2) avoids a SIGSEGV in the
-  NVIDIA proprietary driver when a GL context that used an offscreen render target (image filters,
-  group opacity, advanced blend modes) is torn down. The identical code path is clean on llvmpipe.
--->
 <RunSettings>
   <RunConfiguration>
     <EnvironmentVariables>
@@ -16,7 +6,6 @@
       <LIBGL_ALWAYS_SOFTWARE>1</LIBGL_ALWAYS_SOFTWARE>
       <GALLIUM_DRIVER>llvmpipe</GALLIUM_DRIVER>
       <MESA_LOADER_DRIVER_OVERRIDE>llvmpipe</MESA_LOADER_DRIVER_OVERRIDE>
-      <!-- A GLES context on X11/Xvfb must come through EGL (GLX is desktop-GL only). -->
       <SDL_VIDEO_X11_FORCE_EGL>1</SDL_VIDEO_X11_FORCE_EGL>
     </EnvironmentVariables>
   </RunConfiguration>

@@ -79,3 +79,13 @@ mkdir -p ide
 #jq 'map(select(.command | startswith("vpython") or startswith("rm") or startswith("ln") | not))'
 
 ```
+
+### Tests
+
+Tests are included in `tests/NImpeller.Tests` and can be run with
+
+```sh
+dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj
+```
+
+At the moment, they assume you're using `llvmpipe` for a software GL context.

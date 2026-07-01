@@ -19,7 +19,8 @@ static class Program
     [
         new MMarkScene(),
         new ParagraphScene(),
-        new CirclingSquares()
+        new CirclingSquares(),
+        new AnimatedGradientsScene()
     ];
 
     public enum GraphicsApi

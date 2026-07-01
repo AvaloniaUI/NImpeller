@@ -40,4 +40,29 @@ public sealed class PathBuilderTests
         using var path = builder.TakePathNew(ImpellerFillType.kImpellerFillTypeOdd);
         Assert.NotNull(path);
     }
+
+    [Fact]
+    public void GetBounds_reports_the_extent_of_a_line()
+    {
+        using var builder = ImpellerPathBuilder.New()!;
+        builder.MoveTo(new ImpellerPoint { X = 100, Y = 100 });
+        builder.LineTo(new ImpellerPoint { X = 200, Y = 200 });
+        using var path = builder.CopyPathNew(ImpellerFillType.kImpellerFillTypeNonZero)!;
+
+        path.GetBounds(out var bounds);
+
+        Assert.Equal(new ImpellerRect(100, 100, 100, 100), bounds);
+    }
+
+    [Fact]
+    public void GetBounds_reports_the_rect_of_an_added_rect()
+    {
+        using var builder = ImpellerPathBuilder.New()!;
+        builder.AddRect(new ImpellerRect(15, 25, 60, 40));
+        using var path = builder.CopyPathNew(ImpellerFillType.kImpellerFillTypeNonZero)!;
+
+        path.GetBounds(out var bounds);
+
+        Assert.Equal(new ImpellerRect(15, 25, 60, 40), bounds);
+    }
 }

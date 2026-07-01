@@ -411,6 +411,78 @@ public sealed class ImageFiltersScene : IScene
     }
 }
 
+/// <summary>
+/// Renders driven by queried geometry: each shape is framed by the rectangle reported by
+/// <see cref="ImpellerPath.GetBounds"/>, and a marker is placed by mapping a local point through
+/// the matrix reported by <see cref="ImpellerDisplayListBuilder.GetTransform"/>. If either query
+/// returned nothing, the frames and marker would be misplaced, so the golden pins both features.
+/// </summary>
+public sealed class BoundsAndTransformScene : IScene
+{
+    public string TestName => "boundsandtransform";
+    public string Description => "Shapes framed by their queried path bounds; a marker placed via the queried transform.";
+
+    public void Render(ImpellerContext context, ImpellerDisplayListBuilder b, SceneParameters p)
+    {
+        Draw.Background(b, ImpellerColor.FromRgb(18, 20, 28));
+
+        using var fill = ImpellerPaint.New()!;
+        using var frame = ImpellerPaint.New()!;
+        frame.SetColor(ImpellerColor.FromRgb(90, 230, 140));
+        frame.SetDrawStyle(ImpellerDrawStyle.kImpellerDrawStyleStroke);
+        frame.SetStrokeWidth(3);
+
+        // A triangle, a rect, and an oval — each filled, then outlined by its reported bounds.
+        using (var pb = ImpellerPathBuilder.New()!)
+        {
+            pb.MoveTo(Draw.P(40, 120));
+            pb.LineTo(Draw.P(90, 40));
+            pb.LineTo(Draw.P(140, 120));
+            pb.Close();
+            using var tri = pb.CopyPathNew(ImpellerFillType.kImpellerFillTypeNonZero)!;
+            fill.SetColor(ImpellerColor.FromRgb(220, 80, 80));
+            b.DrawPath(tri, fill);
+            tri.GetBounds(out var bounds);
+            b.DrawRect(bounds, frame);
+        }
+
+        using (var pb = ImpellerPathBuilder.New()!)
+        {
+            pb.AddRect(new ImpellerRect(180, 40, 120, 70));
+            using var rect = pb.CopyPathNew(ImpellerFillType.kImpellerFillTypeNonZero)!;
+            fill.SetColor(ImpellerColor.FromRgb(80, 140, 240));
+            b.DrawPath(rect, fill);
+            rect.GetBounds(out var bounds);
+            b.DrawRect(bounds, frame);
+        }
+
+        using (var pb = ImpellerPathBuilder.New()!)
+        {
+            pb.AddOval(new ImpellerRect(40, 170, 120, 90));
+            using var oval = pb.CopyPathNew(ImpellerFillType.kImpellerFillTypeNonZero)!;
+            fill.SetColor(ImpellerColor.FromRgb(240, 200, 70));
+            b.DrawPath(oval, fill);
+            oval.GetBounds(out var bounds);
+            b.DrawRect(bounds, frame);
+        }
+
+        // Draw a rect under a translate+scale, query the resulting transform, then map its local
+        // centre back to root space and drop a marker there.
+        b.Save();
+        b.Translate(240, 210);
+        b.Scale(0.8f, 0.8f);
+        fill.SetColor(ImpellerColor.FromRgb(200, 120, 230));
+        b.DrawRect(new ImpellerRect(-40, -40, 80, 80), fill);
+        b.GetTransform(out var transform);
+        b.Restore();
+
+        var centre = Vector2.Transform(Vector2.Zero, transform.Matrix);
+        using var marker = ImpellerPaint.New()!;
+        marker.SetColor(ImpellerColor.FromRgb(255, 255, 255));
+        b.DrawOval(Draw.Rect(centre.X - 8, centre.Y - 8, 16, 16), marker);
+    }
+}
+
 public sealed class SolidShapesScene : IScene
 {
     public string TestName => "solidshapes";

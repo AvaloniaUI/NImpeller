@@ -38,7 +38,8 @@ public sealed class GoldenImageTests
         new MaskBlurScene(),       360, 300,
         new ShadowsScene(),        340, 180,
         new GroupOpacityScene(),   300, 260,
-        new ImageFiltersScene(),   260, 240);
+        new ImageFiltersScene(),   260, 240,
+        new BoundsAndTransformScene(), 340, 300);
 
     public static TheoryData<string> SceneNames()
     {

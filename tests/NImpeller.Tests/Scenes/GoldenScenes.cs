@@ -1,10 +1,17 @@
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using NImpeller;
 
 namespace NImpeller.Tests.Scenes;
 
 internal static class Draw
 {
+    // Turns a null native factory result into an immediate, self-describing failure instead of a
+    // delayed NullReferenceException at the first use.
+    public static T NotNull<T>(T? value, [CallerArgumentExpression(nameof(value))] string? expr = null)
+        where T : class =>
+        value ?? throw new InvalidOperationException($"Expected a non-null result from: {expr}");
+
     public static ImpellerPoint P(float x, float y) => new() { X = x, Y = y };
 
     // ImpellerRect's only ctor takes ints; this builds one from floats for computed coordinates.
@@ -503,8 +510,8 @@ public sealed class GradientsScene : IScene
         Draw.Background(b, ImpellerColor.FromRgb(18, 20, 28));
 
         // Linear (top-left): four-stop ramp left→right across the rect.
-        using (var linear = ImpellerColorSource.CreateLinearGradientNew(
-                   Draw.P(20, 0), Draw.P(160, 0), Rainbow, EvenStops, ImpellerTileMode.kImpellerTileModeClamp)!)
+        using (var linear = Draw.NotNull(ImpellerColorSource.CreateLinearGradientNew(
+                   Draw.P(20, 0), Draw.P(160, 0), Rainbow, EvenStops, ImpellerTileMode.kImpellerTileModeClamp)))
         {
             using var paint = ImpellerPaint.New()!;
             paint.SetColorSource(linear);
@@ -519,8 +526,8 @@ public sealed class GradientsScene : IScene
             ImpellerColor.FromRgb(20, 40, 90),
         };
         var radialStops = new[] { 0f, 0.5f, 1f };
-        using (var radial = ImpellerColorSource.CreateRadialGradientNew(
-                   Draw.P(270, 75), 70f, radialColors, radialStops, ImpellerTileMode.kImpellerTileModeClamp)!)
+        using (var radial = Draw.NotNull(ImpellerColorSource.CreateRadialGradientNew(
+                   Draw.P(270, 75), 70f, radialColors, radialStops, ImpellerTileMode.kImpellerTileModeClamp)))
         {
             using var paint = ImpellerPaint.New()!;
             paint.SetColorSource(radial);
@@ -528,8 +535,8 @@ public sealed class GradientsScene : IScene
         }
 
         // Sweep (bottom-left): full-circle multi-stop wheel on an oval.
-        using (var sweep = ImpellerColorSource.CreateSweepGradientNew(
-                   Draw.P(90, 220), 0f, 360f, Rainbow, EvenStops, ImpellerTileMode.kImpellerTileModeClamp)!)
+        using (var sweep = Draw.NotNull(ImpellerColorSource.CreateSweepGradientNew(
+                   Draw.P(90, 220), 0f, 360f, Rainbow, EvenStops, ImpellerTileMode.kImpellerTileModeClamp)))
         {
             using var paint = ImpellerPaint.New()!;
             paint.SetColorSource(sweep);
@@ -537,9 +544,9 @@ public sealed class GradientsScene : IScene
         }
 
         // Conical (bottom-right): between two offset circles.
-        using (var conical = ImpellerColorSource.CreateConicalGradientNew(
+        using (var conical = Draw.NotNull(ImpellerColorSource.CreateConicalGradientNew(
                    Draw.P(240, 190), 8f, Draw.P(270, 220), 70f, Rainbow, EvenStops,
-                   ImpellerTileMode.kImpellerTileModeClamp)!)
+                   ImpellerTileMode.kImpellerTileModeClamp)))
         {
             using var paint = ImpellerPaint.New()!;
             paint.SetColorSource(conical);

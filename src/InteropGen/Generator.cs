@@ -25,7 +25,12 @@ class Generator
             "ImpellerContextCreateOpenGLESNew",
             "ImpellerParagraphBuilderAddText",
             "ImpellerContextCreateMetalNew",
-            "ImpellerContextCreateVulkanNew"
+            "ImpellerContextCreateVulkanNew",
+            "ImpellerColorSourceCreateLinearGradientNew",
+            "ImpellerColorSourceCreateRadialGradientNew",
+            "ImpellerColorSourceCreateConicalGradientNew",
+            "ImpellerColorSourceCreateSweepGradientNew",
+            "ImpellerTypographyContextRegisterFont"
         };
         var fastFunctions = new HashSet<string>()
         {

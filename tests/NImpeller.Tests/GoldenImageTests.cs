@@ -39,7 +39,10 @@ public sealed class GoldenImageTests
         new ShadowsScene(),        340, 180,
         new GroupOpacityScene(),   300, 260,
         new ImageFiltersScene(),   260, 240,
-        new BoundsAndTransformScene(), 340, 300);
+        new BoundsAndTransformScene(), 340, 300,
+        new GradientsScene(),      360, 310,
+        new CpuTextureScene(),     240, 200,
+        new CustomFontScene(),     360, 260);
 
     public static TheoryData<string> SceneNames()
     {

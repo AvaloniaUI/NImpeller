@@ -483,6 +483,172 @@ public sealed class BoundsAndTransformScene : IScene
     }
 }
 
+public sealed class GradientsScene : IScene
+{
+    public string TestName => "gradients";
+    public string Description => "Multi-stop linear, radial, sweep, and conical gradients.";
+
+    private static readonly ImpellerColor[] Rainbow =
+    {
+        ImpellerColor.FromRgb(220, 40, 40),
+        ImpellerColor.FromRgb(240, 200, 40),
+        ImpellerColor.FromRgb(40, 200, 120),
+        ImpellerColor.FromRgb(60, 120, 230),
+    };
+
+    private static readonly float[] EvenStops = { 0f, 0.34f, 0.67f, 1f };
+
+    public void Render(ImpellerContext context, ImpellerDisplayListBuilder b, SceneParameters p)
+    {
+        Draw.Background(b, ImpellerColor.FromRgb(18, 20, 28));
+
+        // Linear (top-left): four-stop ramp left→right across the rect.
+        using (var linear = ImpellerColorSource.CreateLinearGradientNew(
+                   Draw.P(20, 0), Draw.P(160, 0), Rainbow, EvenStops, ImpellerTileMode.kImpellerTileModeClamp)!)
+        {
+            using var paint = ImpellerPaint.New()!;
+            paint.SetColorSource(linear);
+            b.DrawRect(new ImpellerRect(20, 20, 140, 110), paint);
+        }
+
+        // Radial (top-right): bright centre fading to a dark edge.
+        var radialColors = new[]
+        {
+            ImpellerColor.FromRgb(250, 250, 250),
+            ImpellerColor.FromRgb(90, 160, 240),
+            ImpellerColor.FromRgb(20, 40, 90),
+        };
+        var radialStops = new[] { 0f, 0.5f, 1f };
+        using (var radial = ImpellerColorSource.CreateRadialGradientNew(
+                   Draw.P(270, 75), 70f, radialColors, radialStops, ImpellerTileMode.kImpellerTileModeClamp)!)
+        {
+            using var paint = ImpellerPaint.New()!;
+            paint.SetColorSource(radial);
+            b.DrawRect(new ImpellerRect(200, 20, 140, 110), paint);
+        }
+
+        // Sweep (bottom-left): full-circle multi-stop wheel on an oval.
+        using (var sweep = ImpellerColorSource.CreateSweepGradientNew(
+                   Draw.P(90, 220), 0f, 360f, Rainbow, EvenStops, ImpellerTileMode.kImpellerTileModeClamp)!)
+        {
+            using var paint = ImpellerPaint.New()!;
+            paint.SetColorSource(sweep);
+            b.DrawOval(new ImpellerRect(20, 150, 140, 140), paint);
+        }
+
+        // Conical (bottom-right): between two offset circles.
+        using (var conical = ImpellerColorSource.CreateConicalGradientNew(
+                   Draw.P(240, 190), 8f, Draw.P(270, 220), 70f, Rainbow, EvenStops,
+                   ImpellerTileMode.kImpellerTileModeClamp)!)
+        {
+            using var paint = ImpellerPaint.New()!;
+            paint.SetColorSource(conical);
+            b.DrawRect(new ImpellerRect(200, 150, 140, 140), paint);
+        }
+    }
+}
+
+public sealed class CpuTextureScene : IScene
+{
+    public string TestName => "cputexture";
+    public string Description => "A CPU-built RGBA bitmap uploaded via TextureCreateWithContentsNew and drawn magnified.";
+
+    public void Render(ImpellerContext context, ImpellerDisplayListBuilder b, SceneParameters p)
+    {
+        Draw.Background(b, ImpellerColor.FromRgb(30, 30, 36));
+
+        // A deterministic 4x4 RGBA image: R ramps across x, G ramps across y, B a checker, opaque.
+        const int size = 4;
+        var pixels = new byte[size * size * 4];
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                int i = (y * size + x) * 4;
+                pixels[i + 0] = (byte)(x * 85);
+                pixels[i + 1] = (byte)(y * 85);
+                pixels[i + 2] = (byte)(((x + y) & 1) * 255);
+                pixels[i + 3] = 255;
+            }
+        }
+
+        using var mem = new ImpellerUnmanagedMemory(pixels);
+        var descriptor = new ImpellerTextureDescriptor
+        {
+            Pixel_format = ImpellerPixelFormat.kImpellerPixelFormatRGBA8888,
+            Size = new ImpellerISize(size, size),
+            Mip_count = 1,
+        };
+
+        using var texture = context.TextureCreateWithContentsNew(descriptor, mem, System.IntPtr.Zero)
+            ?? throw new System.InvalidOperationException("TextureCreateWithContentsNew returned null");
+
+        using var paint = ImpellerPaint.New()!;
+        b.DrawTextureRect(
+            texture,
+            new ImpellerRect(0, 0, size, size),
+            new ImpellerRect(20, 20, p.Width - 40, p.Height - 40),
+            ImpellerTextureSampling.kImpellerTextureSamplingNearestNeighbor,
+            paint);
+    }
+}
+
+public sealed class CustomFontScene : IScene
+{
+    public string TestName => "customfont";
+    public string Description => "Text laid out with a custom font registered from memory (Ahem).";
+
+    private const string FontFamily = "NImpellerAhem";
+
+    private static byte[] LoadAhem()
+    {
+        var path = System.IO.Path.Combine(System.AppContext.BaseDirectory, "Assets", "Ahem.ttf");
+        return System.IO.File.ReadAllBytes(path);
+    }
+
+    public void Render(ImpellerContext context, ImpellerDisplayListBuilder b, SceneParameters p)
+    {
+        Draw.Background(b, ImpellerColor.FromRgb(245, 245, 245));
+
+        using var typography = ImpellerTypographyContext.New()
+            ?? throw new System.InvalidOperationException("TypographyContext.New returned null");
+
+        using (var mem = new ImpellerUnmanagedMemory(LoadAhem()))
+        {
+            if (!typography.RegisterFont(mem, FontFamily))
+            {
+                throw new System.InvalidOperationException("RegisterFont failed for the Ahem test font.");
+            }
+        }
+
+        // Three lines, distinct colors/sizes. Spaces are blank in Ahem, so each word is a run of
+        // solid boxes separated by gaps — a recognizable, deterministic pattern.
+        DrawLine(b, typography, "AB CD", 44, ImpellerColor.FromRgb(20, 30, 40), 20, 20);
+        DrawLine(b, typography, "IMP ELL", 44, ImpellerColor.FromRgb(200, 60, 60), 20, 110);
+        DrawLine(b, typography, "font test", 30, ImpellerColor.FromRgb(40, 90, 200), 20, 200);
+    }
+
+    private static void DrawLine(
+        ImpellerDisplayListBuilder b, ImpellerTypographyContext typography,
+        string text, float fontSize, ImpellerColor color, float x, float y)
+    {
+        using var paint = ImpellerPaint.New()!;
+        paint.SetColor(color);
+
+        using var style = ImpellerParagraphStyle.New()!;
+        style.SetForeground(paint);
+        style.SetFontSize(fontSize);
+        style.SetFontFamily(FontFamily);
+
+        using var builder = typography.ParagraphBuilderNew()!;
+        builder.PushStyle(style);
+        builder.AddText(text);
+
+        using var paragraph = builder.BuildParagraphNew(width: 600)!;
+        b.DrawParagraph(paragraph, new ImpellerPoint { X = x, Y = y });
+    }
+}
+
 public sealed class SolidShapesScene : IScene
 {
     public string TestName => "solidshapes";

@@ -28,6 +28,12 @@ public unsafe partial class ImpellerTypographyContext
         var length = contents.Length;
         int intLength = checked((int)length);
 
+        if (length != 0 && contents.Data == null)
+        {
+            throw new ArgumentException(
+                "Memory reports a non-zero Length but a null Data pointer (is it disposed?).", nameof(contents));
+        }
+
         // Alloc at least one byte so the copy is a valid, freeable pointer even for empty input.
         var copy = (byte*)NativeMemory.Alloc((nuint)(length == 0 ? 1 : length));
         if (length != 0)

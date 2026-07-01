@@ -112,13 +112,6 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
 
         _impeller = ImpellerContext.CreateOpenGLESNew(name => (IntPtr)_sdl.GLGetProcAddress(name))
             ?? throw new InvalidOperationException("ImpellerContext.CreateOpenGLESNew returned null");
-
-        RenderToFbo(16, 16, builder =>
-        {
-            using var paint = ImpellerPaint.New()!;
-            paint.SetColor(ImpellerColor.FromRgb(0, 0, 0));
-            builder.DrawPaint(paint);
-        });
     }
 
     private void TeardownGL()
@@ -201,54 +194,51 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
               0,   0,   0, 255, 255, 255, 255, 255,
         };
 
+        // impeller.h documents the handle param as "transfer-in ownership": Impeller adopts glTex
+        // and deletes it when the ImpellerTexture is released. Do NOT glDeleteTexture(glTex) here —
+        // that double-frees the name, and because Impeller defers GL deletes, it later kills a name
+        // recycled for another render's target, blanking that scene (e.g. groupopacity → empty).
         uint glTex = _gl.GenTexture();
-        try
+        _gl.BindTexture(TextureTarget.Texture2D, glTex);
+        fixed (byte* p = checker)
         {
-            _gl.BindTexture(TextureTarget.Texture2D, glTex);
-            fixed (byte* p = checker)
-            {
-                _gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba8,
-                    2, 2, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
-            }
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
-            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
-
-            var descriptor = new ImpellerTextureDescriptor
-            {
-                Pixel_format = ImpellerPixelFormat.kImpellerPixelFormatRGBA8888,
-                Size = new ImpellerISize(2, 2),
-                Mip_count = 1,
-            };
-
-            ulong reportedHandle;
-            byte[] pixels;
-            using (var texture = _impeller.TextureCreateWithOpenGLTextureHandleNew(descriptor, glTex)
-                ?? throw new InvalidOperationException("TextureCreateWithOpenGLTextureHandleNew returned null"))
-            {
-                reportedHandle = texture.GetOpenGLHandle();
-
-                pixels = RenderToFbo(width, height, builder =>
-                {
-                    using var background = ImpellerPaint.New()!;
-                    background.SetColor(ImpellerColor.FromRgb(30, 30, 30));
-                    builder.DrawPaint(background);
-
-                    using var paint = ImpellerPaint.New()!;
-                    builder.DrawTextureRect(
-                        texture,
-                        new ImpellerRect(0, 0, 2, 2),
-                        new ImpellerRect(20, 20, width - 40, height - 40),
-                        ImpellerTextureSampling.kImpellerTextureSamplingNearestNeighbor,
-                        paint);
-                });
-            }
-
-            return new TextureInteropResult(pixels, glTex, reportedHandle);
+            _gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba8,
+                2, 2, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
         }
-        finally
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+
+        var descriptor = new ImpellerTextureDescriptor
         {
-            _gl.DeleteTexture(glTex);
+            Pixel_format = ImpellerPixelFormat.kImpellerPixelFormatRGBA8888,
+            Size = new ImpellerISize(2, 2),
+            Mip_count = 1,
+        };
+
+        ulong reportedHandle;
+        byte[] pixels;
+        using (var texture = _impeller.TextureCreateWithOpenGLTextureHandleNew(descriptor, glTex)
+            ?? throw new InvalidOperationException("TextureCreateWithOpenGLTextureHandleNew returned null"))
+        {
+            reportedHandle = texture.GetOpenGLHandle();
+
+            pixels = RenderToFbo(width, height, builder =>
+            {
+                using var background = ImpellerPaint.New()!;
+                background.SetColor(ImpellerColor.FromRgb(30, 30, 30));
+                builder.DrawPaint(background);
+
+                using var paint = ImpellerPaint.New()!;
+                builder.DrawTextureRect(
+                    texture,
+                    new ImpellerRect(0, 0, 2, 2),
+                    new ImpellerRect(20, 20, width - 40, height - 40),
+                    ImpellerTextureSampling.kImpellerTextureSamplingNearestNeighbor,
+                    paint);
+            });
         }
+
+        return new TextureInteropResult(pixels, glTex, reportedHandle);
     }
 
     // glReadPixels returns rows bottom-to-top; images are top-to-bottom.

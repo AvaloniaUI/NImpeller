@@ -195,43 +195,53 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
         };
 
         uint glTex = _gl.GenTexture();
-        _gl.BindTexture(TextureTarget.Texture2D, glTex);
-        fixed (byte* p = checker)
+        try
         {
-            _gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba8,
-                2, 2, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
+            _gl.BindTexture(TextureTarget.Texture2D, glTex);
+            fixed (byte* p = checker)
+            {
+                _gl.TexImage2D(TextureTarget.Texture2D, 0, (int)InternalFormat.Rgba8,
+                    2, 2, 0, PixelFormat.Rgba, PixelType.UnsignedByte, p);
+            }
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+            _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+
+            var descriptor = new ImpellerTextureDescriptor
+            {
+                Pixel_format = ImpellerPixelFormat.kImpellerPixelFormatRGBA8888,
+                Size = new ImpellerISize(2, 2),
+                Mip_count = 1,
+            };
+
+            ulong reportedHandle;
+            byte[] pixels;
+            using (var texture = _impeller.TextureCreateWithOpenGLTextureHandleNew(descriptor, glTex)
+                ?? throw new InvalidOperationException("TextureCreateWithOpenGLTextureHandleNew returned null"))
+            {
+                reportedHandle = texture.GetOpenGLHandle();
+
+                pixels = RenderToFbo(width, height, builder =>
+                {
+                    using var background = ImpellerPaint.New()!;
+                    background.SetColor(ImpellerColor.FromRgb(30, 30, 30));
+                    builder.DrawPaint(background);
+
+                    using var paint = ImpellerPaint.New()!;
+                    builder.DrawTextureRect(
+                        texture,
+                        new ImpellerRect(0, 0, 2, 2),
+                        new ImpellerRect(20, 20, width - 40, height - 40),
+                        ImpellerTextureSampling.kImpellerTextureSamplingNearestNeighbor,
+                        paint);
+                });
+            }
+
+            return new TextureInteropResult(pixels, glTex, reportedHandle);
         }
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
-        _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
-
-        var descriptor = new ImpellerTextureDescriptor
+        finally
         {
-            Pixel_format = ImpellerPixelFormat.kImpellerPixelFormatRGBA8888,
-            Size = new ImpellerISize(2, 2),
-            Mip_count = 1,
-        };
-
-        using var texture = _impeller.TextureCreateWithOpenGLTextureHandleNew(descriptor, glTex)
-            ?? throw new InvalidOperationException("TextureCreateWithOpenGLTextureHandleNew returned null");
-
-        ulong reportedHandle = texture.GetOpenGLHandle();
-
-        var pixels = RenderToFbo(width, height, builder =>
-        {
-            using var background = ImpellerPaint.New()!;
-            background.SetColor(ImpellerColor.FromRgb(30, 30, 30));
-            builder.DrawPaint(background);
-
-            using var paint = ImpellerPaint.New()!;
-            builder.DrawTextureRect(
-                texture,
-                new ImpellerRect(0, 0, 2, 2),
-                new ImpellerRect(20, 20, width - 40, height - 40),
-                ImpellerTextureSampling.kImpellerTextureSamplingNearestNeighbor,
-                paint);
-        });
-
-        return new TextureInteropResult(pixels, glTex, reportedHandle);
+            _gl.DeleteTexture(glTex);
+        }
     }
 
     // glReadPixels returns rows bottom-to-top; images are top-to-bottom.
@@ -272,6 +282,8 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
                 $"Headless GL operation '{op}' did not complete within {InvokeTimeout.TotalSeconds:0}s " +
                 "(a native call likely deadlocked).");
         }
+
+        done.Dispose();
 
         if (error != null)
         {

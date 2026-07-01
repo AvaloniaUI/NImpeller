@@ -29,6 +29,12 @@ static class Program
         Vulkan,
         Metal
     }
+    
+    public enum WindowBackend
+    {
+        SDL,
+        GLFW
+    }
 
     public class Options
     {
@@ -43,6 +49,9 @@ static class Program
 
         [Option('h', "height", Required = false, Default = 600, HelpText = "Window height")]
         public int Height { get; set; }
+        
+        [Option('b', "backend", Required = false, Default = WindowBackend.SDL, HelpText = "Window backend (SDL, GLFW)")]
+        public WindowBackend Backend { get; set; }
     }
 
     static void Main(string[] args)
@@ -81,10 +90,23 @@ static class Program
                 .Color(Color.Blue));
 
         AnsiConsole.MarkupLine("[dim]A .NET binding for Flutter's Impeller graphics engine[/]\n");
+        
+        var selectedBackend = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("[green]Select Window Backend:[/]")
+                .PageSize(10)
+                .AddChoices("SDL", "GLFW"));
+
+        var backend = selectedBackend switch
+        {
+            "SDL" => WindowBackend.SDL,
+            "GLFW" => WindowBackend.GLFW,
+            _ => WindowBackend.SDL
+        };
 
         // Select Graphics API
         var availableApis = RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? AllApis : NonMetalApis;
-
+        
         var selectedApi = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("[green]Select Graphics API:[/]")
@@ -131,7 +153,8 @@ static class Program
             Api = api,
             Scene = selectedScene.Name,
             Width = width,
-            Height = height
+            Height = height,
+            Backend = backend
         };
     }
 
@@ -171,15 +194,39 @@ static class Program
             return;
         }
 
-        // For OpenGL and Vulkan, use SDL
-        var sdlApi = options.Api == GraphicsApi.OpenGL ? SdlApplication.GraphicsApi.OpenGL : SdlApplication.GraphicsApi.Vulkan;
-        var sdlLogger = _loggerFactory!.CreateLogger<SdlApplication>();
-        var sdlApp = new SdlApplication(sdlApi, sdlLogger);
-        if (sdlApp.Initialize(options.Width, options.Height))
+        IApplication app;
+        if (options.Backend == WindowBackend.GLFW)
         {
-            sdlApp.SetScene(scene);
-            RunWithConsoleDisplay(sdlApp);
+            var glfwApi = options.Api == GraphicsApi.OpenGL 
+                ? GlfwApplication.GraphicsApi.OpenGL 
+                : GlfwApplication.GraphicsApi.Vulkan;
+            var glfwLogger = _loggerFactory!.CreateLogger<GlfwApplication>();
+            var glfwApp = new GlfwApplication(glfwApi,glfwLogger);
+            if (!glfwApp.Initialize(options.Width, options.Height))
+            {
+                logger.LogError("GLFW initialization failed.");
+                return;
+            }
+            glfwApp.SetScene(scene);
+            app = glfwApp;
         }
+        else
+        {
+            var sdlApi = options.Api == GraphicsApi.OpenGL 
+                ? SdlApplication.GraphicsApi.OpenGL 
+                : SdlApplication.GraphicsApi.Vulkan;
+            var sdlLogger = _loggerFactory!.CreateLogger<SdlApplication>();
+            var sdlApp = new SdlApplication(sdlApi, sdlLogger);
+            if (!sdlApp.Initialize(options.Width, options.Height))
+            {
+                logger.LogError("SDL initialization failed.");
+                return;
+            }
+            sdlApp.SetScene(scene);
+            app = sdlApp;
+        }
+        
+        RunWithConsoleDisplay(app);
     }
 
     static void RunWithConsoleDisplay(IApplication app)

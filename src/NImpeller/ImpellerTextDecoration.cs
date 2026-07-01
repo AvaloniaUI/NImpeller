@@ -1,6 +1,8 @@
+using System;
+
 namespace NImpeller;
 
-public partial struct ImpellerTextDecoration
+public partial struct ImpellerTextDecoration : IEquatable<ImpellerTextDecoration>
 {
     /// <summary>
     /// Initializes a new instance of the <see cref="ImpellerTextDecoration"/> struct.
@@ -47,4 +49,18 @@ public partial struct ImpellerTextDecoration
     /// <returns>A new <see cref="ImpellerTextDecoration"/> with a solid line-through.</returns>
     public static ImpellerTextDecoration LineThrough(ImpellerColor color, float thicknessMultiplier = 1f) =>
         new(ImpellerTextDecorationType.kImpellerTextDecorationTypeLineThrough, ImpellerTextDecorationStyle.kImpellerTextDecorationStyleSolid, color, thicknessMultiplier);
+
+    public bool Equals(ImpellerTextDecoration other) =>
+        Types == other.Types
+        && Style == other.Style
+        && Color.Equals(other.Color)
+        && Thickness_multiplier.Equals(other.Thickness_multiplier);
+
+    public override bool Equals(object? obj) => obj is ImpellerTextDecoration other && Equals(other);
+
+    public override int GetHashCode() => HashCode.Combine(Types, Style, Color, Thickness_multiplier);
+
+    public static bool operator ==(ImpellerTextDecoration left, ImpellerTextDecoration right) => left.Equals(right);
+
+    public static bool operator !=(ImpellerTextDecoration left, ImpellerTextDecoration right) => !left.Equals(right);
 }

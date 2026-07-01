@@ -1,0 +1,80 @@
+name: Tests
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # Software OpenGL ES (Mesa/llvmpipe) + SDL2 + a virtual display. The tests render offscreen
+      # on llvmpipe (forced by tests/NImpeller.Tests/test.runsettings) but SDL still needs a video
+      # driver, so we provide one with Xvfb.
+      - name: Install GL + SDL runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb \
+            libsdl2-2.0-0 \
+            libegl1 libgles2 libglvnd0 \
+            libegl-mesa0 libgl1-mesa-dri libglx-mesa0
+          # Silk.NET.SDL dlopens "libSDL2-2.0.so", but the runtime package only ships
+          # "libSDL2-2.0.so.0" (the unversioned symlink lives in libsdl2-dev). Create it.
+          SO=$(ldconfig -p | awk '/libSDL2-2.0.so.0/{print $NF; exit}')
+          echo "Linking libSDL2-2.0.so -> $SO"
+          sudo ln -sf "$SO" "$(dirname "$SO")/libSDL2-2.0.so"
+          sudo ldconfig
+
+      # Bindings (src/NImpeller/Generated/Bindings.g.cs) and the native libimpeller.so are not
+      # committed; download the Linux SDK at the latest Flutter engine commit and generate them.
+      - name: Download Impeller SDK (linux-x64) and generate bindings
+        run: |
+          chmod +x ./build.sh
+          ./build.sh DownloadLatestImpeller --platform linux-x64
+          ./build.sh GenerateBindings --platform linux-x64
+
+      # Prints what GL/EGL stack the runner actually exposes (helps diagnose context failures).
+      - name: GL diagnostics
+        continue-on-error: true
+        env:
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GALLIUM_DRIVER: llvmpipe
+          __EGL_VENDOR_LIBRARY_FILENAMES: /usr/share/glvnd/egl_vendor.d/50_mesa.json
+        run: |
+          sudo apt-get install -y --no-install-recommends mesa-utils mesa-utils-extra || true
+          ls -l /usr/share/glvnd/egl_vendor.d/ || true
+          echo "== eglinfo =="; xvfb-run -a eglinfo 2>&1 | head -60 || true
+          echo "== glxinfo -B =="; xvfb-run -a glxinfo -B 2>&1 | head -25 || true
+
+      - name: Test
+        run: xvfb-run -a dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj -c Release
+
+      # On a golden mismatch the tests write actual/golden PNGs here for inspection.
+      - name: Upload golden diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: golden-failures
+          path: tests/NImpeller.Tests/bin/Release/net8.0/TestFailures/
+          if-no-files-found: ignore

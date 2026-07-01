@@ -1,0 +1,2 @@
+# Golden baselines (.rimg + .png) live here and ARE committed.
+# Generate/refresh with: UPDATE_GOLDENS=1 dotnet test

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RunSettings>
+  <RunConfiguration>
+    <EnvironmentVariables>
+      <__EGL_VENDOR_LIBRARY_FILENAMES>/usr/share/glvnd/egl_vendor.d/50_mesa.json</__EGL_VENDOR_LIBRARY_FILENAMES>
+      <LIBGL_ALWAYS_SOFTWARE>1</LIBGL_ALWAYS_SOFTWARE>
+      <GALLIUM_DRIVER>llvmpipe</GALLIUM_DRIVER>
+      <MESA_LOADER_DRIVER_OVERRIDE>llvmpipe</MESA_LOADER_DRIVER_OVERRIDE>
+      <SDL_VIDEO_X11_FORCE_EGL>1</SDL_VIDEO_X11_FORCE_EGL>
+    </EnvironmentVariables>
+  </RunConfiguration>
+</RunSettings>

@@ -1,0 +1,87 @@
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+    <PropertyGroup>
+        <DefineConstants Condition="$([MSBuild]::IsOSPlatform('Windows'))">WINDOWS</DefineConstants>
+        <DefineConstants Condition="$([MSBuild]::IsOSPlatform('Linux'))">LINUX</DefineConstants>
+        <DefineConstants Condition="$([MSBuild]::IsOSPlatform('OSX'))">MACOS</DefineConstants>
+        <IsWindows>$([MSBuild]::IsOSPlatform('Windows'))</IsWindows>
+        <IsLinux>$([MSBuild]::IsOSPlatform('Linux'))</IsLinux>
+        <IsOSX>$([MSBuild]::IsOSPlatform('OSX'))</IsOSX>
+        <ImpellerSdkDirectory>$(MSBuildThisFileDirectory)..\..\external\impeller_sdk</ImpellerSdkDirectory>
+        <IsArm64>false</IsArm64>
+        <IsArm64 Condition="$(RuntimeIdentifier.Contains('arm64')) OR $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()) == 'Arm64'">true</IsArm64>
+        <IsX64>false</IsX64>
+        <IsX64 Condition="$(RuntimeIdentifier.Contains('x64')) OR ($([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()) == 'X64' AND '$(IsArm64)' == 'false')">true</IsX64>
+    </PropertyGroup>
+    
+    <ItemGroup Condition="$(TargetFramework.Contains('-windows')) == true AND '$(IsArm64)' == 'true'">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-arm64\lib\impeller.dll">
+            <Pack>true</Pack>
+            <PackageCopyToOutput>true</PackageCopyToOutput>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>impeller.dll</TargetPath>
+        </None>
+    </ItemGroup>
+    
+    <ItemGroup Condition="$(TargetFramework.Contains('-windows')) == true AND '$(IsArm64)' == 'false'">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-x64\lib\impeller.dll">
+            <Pack>true</Pack>
+            <PackageCopyToOutput>true</PackageCopyToOutput>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>impeller.dll</TargetPath>
+        </None>
+    </ItemGroup>
+    
+    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsWindows) AND '$(IsArm64)' == 'true'">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-arm64\lib\impeller.dll">
+            <Pack>true</Pack>
+            <PackageCopyToOutput>true</PackageCopyToOutput>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>impeller.dll</TargetPath>
+        </None>
+    </ItemGroup>
+    
+    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsWindows) AND '$(IsArm64)' == 'false'">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-x64\lib\impeller.dll">
+            <Pack>true</Pack>
+            <PackageCopyToOutput>true</PackageCopyToOutput>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>impeller.dll</TargetPath>
+        </None>
+    </ItemGroup>
+    
+    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsOSX) AND '$(IsArm64)' == 'true'">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\darwin-arm64\lib\libimpeller.dylib">
+            <Pack>true</Pack>
+            <PackageCopyToOutput>true</PackageCopyToOutput>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>libimpeller.dylib</TargetPath>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsOSX) AND '$(IsArm64)' == 'false'">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\darwin-x64\lib\libimpeller.dylib">
+            <Pack>true</Pack>
+            <PackageCopyToOutput>true</PackageCopyToOutput>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>libimpeller.dylib</TargetPath>
+        </None>
+    </ItemGroup>
+    
+    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsLinux) AND '$(IsArm64)' == 'true'">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\linux-arm64\lib\libimpeller.so">
+            <Pack>true</Pack>
+            <PackageCopyToOutput>true</PackageCopyToOutput>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>libimpeller.so</TargetPath>
+        </None>
+    </ItemGroup>
+    
+    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsLinux) AND '$(IsArm64)' == 'false'">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\linux-x64\lib\libimpeller.so">
+            <Pack>true</Pack>
+            <PackageCopyToOutput>true</PackageCopyToOutput>
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <TargetPath>libimpeller.so</TargetPath>
+        </None>
+    </ItemGroup>
+</Project>

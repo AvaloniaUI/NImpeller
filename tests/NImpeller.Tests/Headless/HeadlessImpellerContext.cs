@@ -112,6 +112,13 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
 
         _impeller = ImpellerContext.CreateOpenGLESNew(name => (IntPtr)_sdl.GLGetProcAddress(name))
             ?? throw new InvalidOperationException("ImpellerContext.CreateOpenGLESNew returned null");
+
+        RenderToFbo(16, 16, builder =>
+        {
+            using var paint = ImpellerPaint.New()!;
+            paint.SetColor(ImpellerColor.FromRgb(0, 0, 0));
+            builder.DrawPaint(paint);
+        });
     }
 
     private void TeardownGL()

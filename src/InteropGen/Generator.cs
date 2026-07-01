@@ -67,7 +67,7 @@ class Generator
             }
 
 
-            bool TryMapCommonType(NativeType type, bool allowStrings, out string res)
+            bool TryMapCommonType(NativeType type, bool allowStrings, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out string res)
             {
                 string? Map()
                 {
@@ -308,7 +308,12 @@ class Generator
                                         GenerateHandleReturn(nativeHandle);
                                     else if(f.ReturnType is NativeNullableType { ElementType: NativeHandle nativeHandleType})
                                     {
-                                        gen.Line("if(ret == null) return null;");
+                                        // New-suffixed factories return a SafeHandle from P/Invoke (compare to null);
+                                        // other handle-returning functions return a raw IntPtr (compare to IntPtr.Zero).
+                                        if (f.Name.EndsWith("New"))
+                                            gen.Line("if(ret == null) return null;");
+                                        else
+                                            gen.Line("if(ret == global::System.IntPtr.Zero) return null;");
                                         GenerateHandleReturn(nativeHandleType);
                                     }
                                     else

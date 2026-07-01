@@ -82,7 +82,7 @@ class NativeEnum(string name) : NativeType
 
 class NativeHandle : NativeType
 {
-    public string Name { get; set; }
+    public required string Name { get; set; }
     public List<NativeFunction> Methods { get; set; } = new();
     public List<NativeFunction> Factories { get; set; } = new();
     public override string ToString() => Name;
@@ -95,7 +95,7 @@ class ExternalNativeType(string name) : NativeType
 
 class NativeFunctionPointer : NativeType
 {
-    public NativeType ReturnType { get; set; }
+    public required NativeType ReturnType { get; set; }
     public List<NativeVar> Parameters { get; set; } = new();
 }
 
@@ -108,9 +108,9 @@ class NativeNamedFunctionPointer(string name) : NativeFunctionPointer
 
 class NativeFunction
 {
-    public string Name { get; set; }
-    public NativeType ReturnType { get; set; }
-    public List<NativeVar> Parameters { get; set; }
+    public required string Name { get; set; }
+    public required NativeType ReturnType { get; set; }
+    public required List<NativeVar> Parameters { get; set; }
 }
 
 class NativeModel

@@ -19,6 +19,7 @@
       <ProjectReference Include="../Sandbox.Metal/Sandbox.Metal.csproj" />
       <ProjectReference Include="../Sandbox.SDL/Sandbox.SDL.csproj" />
       <ProjectReference Include="..\..\src\NImpeller\NImpeller.csproj" />
+      <ProjectReference Include="..\Sandbox.GLFW\Sandbox.GLFW.csproj" />
     </ItemGroup>
 
 </Project>

@@ -88,4 +88,6 @@ Tests are included in `tests/NImpeller.Tests` and can be run with
 dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj
 ```
 
+or run `./test-headless.sh`
+
 At the moment, they assume you're using `llvmpipe` for a software GL context.

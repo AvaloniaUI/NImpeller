@@ -7,6 +7,14 @@ class Generator
     {
         return char.ToUpperInvariant(s[0]) + s.Substring(1);
     }
+
+    static bool IsOutParam(NativeType type) =>
+        NativeNullableType.Unwrap(type) is NativePointerType
+        {
+            Level: 1, IsConst: false, IsString: false, IsGenericDataPointer: false, IsVoidPtr: false
+        } pt
+        && NativeNullableType.Unwrap(pt.ElementType) is NativeStruct;
+
     public static void Generate(NativeModel model, CodeGen gen)
     {
         var manualInteropFunctions = new HashSet<string>()
@@ -254,7 +262,8 @@ class Generator
                             
                             var retType = MapDotnetType(f.ReturnType, true);
                             var decl = $"{retType} {name}(" +
-                                       string.Join(", ", args.Select(p => MapDotnetType(p.Type, true) + " " + p.Name)) +
+                                       string.Join(", ", args.Select(p =>
+                                           (IsOutParam(p.Type) ? "out " : "") + MapDotnetType(p.Type, true) + " " + p.Name)) +
                                        ")";
                             if (isFactory)
                                 decl = "static " + decl;
@@ -269,7 +278,10 @@ class Generator
                                 if (!isFactory)
                                     invocation += "_handle" + (args.Count > 0 ? ", " : "");
 
-                                
+                                // Out-parameters can't have their address taken directly (an `out`
+                                // parameter is a movable managed reference), so each writes into a
+                                // pinned-by-locality local that is copied back after the native call.
+                                var outParams = new List<string>();
                                 for (var index = 0; index < args.Count; index++)
                                 {
                                     var a = args[index];
@@ -282,6 +294,14 @@ class Generator
                                         gen.Line($"using var __marshal_{a.Name} = {ns.Name}.Marshal({a.Name});");
                                         invocation += $"__marshal_{a.Name}.Value";
                                     }
+                                    else if (IsOutParam(a.Type))
+                                    {
+                                        var elemType = MapDotnetType(
+                                            ((NativePointerType)NativeNullableType.Unwrap(a.Type)).ElementType, false);
+                                        gen.Line($"{elemType} __{a.Name};");
+                                        invocation += $"&__{a.Name}";
+                                        outParams.Add(a.Name);
+                                    }
                                     else if (a.Type is NativePointerType { IsString: false, Level: 1, IsGenericDataPointer: false, IsVoidPtr: false })
                                         invocation += $"&{a.Name}";
                                     else
@@ -293,6 +313,9 @@ class Generator
 
                                 invocation += ");";
                                 gen.Line(invocation);
+
+                                foreach (var outParam in outParams)
+                                    gen.Line($"{outParam} = __{outParam};");
 
                                 void GenerateHandleReturn(NativeHandle nativeHandleType)
                                 {

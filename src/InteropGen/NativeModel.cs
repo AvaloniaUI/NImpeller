@@ -24,10 +24,17 @@ class NativeNullableType(NativeType inner, bool nullable) : NativeType
     public static NativeType Unwrap(NativeType nt) => nt is NativeNullableType nnt ? nnt.ElementType : nt;
 }
 
-class NativePointerType(NativeType inner, int level) : NativeType
+class NativePointerType(NativeType inner, int level, bool isConst = false) : NativeType
 {
     public NativeType ElementType => inner;
     public int Level => level;
+
+    /// <summary>
+    /// True when the pointee is <c>const</c>-qualified. Impeller uses a non-const
+    /// single-level struct pointer (named <c>out_*</c>) exclusively for output parameters,
+    /// so this distinguishes an input struct-by-pointer from an out-parameter.
+    /// </summary>
+    public bool IsConst => isConst;
 }
 
 class NativePrimitiveType(string dotnetType) : NativeType
@@ -172,7 +179,8 @@ class NativeModel
         if (type is CppPointerType pt)
         {
             var (wrapped, level) = UnwrapPointer(pt);
-            return new NativePointerType(MapType(wrapped), level);
+            var isConst = wrapped is CppQualifiedType { Qualifier: CppTypeQualifier.Const };
+            return new NativePointerType(MapType(wrapped), level, isConst);
         }
 
         if (type is CppArrayType arrayType)

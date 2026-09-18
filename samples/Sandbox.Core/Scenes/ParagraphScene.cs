@@ -16,7 +16,8 @@ public class ParagraphScene : IScene
     public void Render(ImpellerContext context, ImpellerDisplayListBuilder scene, SceneParameters sceneParameters)
     {
         using var paint = ImpellerPaint.New();
-        using var typographyContext = ImpellerTypographyContext.New();
+        using var ownedTypographyContext = sceneParameters.TypographyContext == null ? ImpellerTypographyContext.New() : null;
+        var typographyContext = sceneParameters.TypographyContext ?? ownedTypographyContext;
         paint.SetColor(ImpellerColor.FromRgb(255, 255, 255));
         paint.SetDrawStyle(ImpellerDrawStyle.kImpellerDrawStyleFill);
         scene.DrawPaint(paint);

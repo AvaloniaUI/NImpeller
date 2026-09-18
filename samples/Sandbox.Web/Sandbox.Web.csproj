@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk.WebAssembly">
+
+  <!-- NImpeller in the browser: Impeller.targets links external/impeller_sdk/wasm/lib/libimpeller.a
+       (built by ../../build-impeller-wasm.sh) statically into dotnet.native.wasm; the app drives a
+       WebGL 2 canvas through Emscripten's GLES emulation. -->
+  <Import Project="../Sandbox/Impeller.targets" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-browser</TargetFramework>
+    <RuntimeIdentifier>browser-wasm</RuntimeIdentifier>
+    <OutputType>Exe</OutputType>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RootNamespace>Sandbox.Web</RootNamespace>
+    <WasmMainJSPath>wwwroot/main.js</WasmMainJSPath>
+
+    <!-- Relink the native runtime so libimpeller.a and the GL shim get pulled in. -->
+    <WasmBuildNative>true</WasmBuildNative>
+    <!-- Impeller expects a GLES 3 (WebGL 2) context and resolves GL entrypoints through
+         emscripten_webgl_get_proc_address. -->
+    <EmccExtraLDFlags>-lGL -sUSE_WEBGL2=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sGL_ENABLE_GET_PROC_ADDRESS=1</EmccExtraLDFlags>
+    <!-- Impeller/Skia need more stack than the .NET default. -->
+    <EmccStackSize>16777216</EmccStackSize>
+    <WasmInitialHeapSize>134217728</WasmInitialHeapSize>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <NativeFileReference Include="native/nimpeller_web.c" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- No system fonts exist in the browser, so text scenes need a font shipped with the app.
+         Noto Sans is SIL OFL 1.1 (Assets/OFL.txt). -->
+    <EmbeddedResource Include="Assets/NotoSans-Regular.ttf" LogicalName="NotoSans-Regular.ttf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../src/NImpeller/NImpeller.csproj" />
+    <ProjectReference Include="../Sandbox.Core/Sandbox.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -7,3 +7,5 @@ riderModule.iml
 external/impeller_sdk
 .DS_Store
 .nuke/temp/
+external/emsdk-dotnet-*
+CLAUDE.md

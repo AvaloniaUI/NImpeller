@@ -62,6 +62,10 @@ class Build : NukeBuild
         "android-x64"
     };
 
+    // Platforms that have no prebuilt SDK on the Flutter feed but can be produced locally
+    // (see build-impeller-wasm.sh) and consumed by GenerateBindings.
+    static readonly string[] LocallyBuiltPlatforms = { "wasm" };
+
     const string BaseUrl = "https://storage.googleapis.com/flutter_infra_release/flutter";
     const string EngineRepo = "https://github.com/flutter/flutter.git";
 
@@ -103,7 +107,7 @@ class Build : NukeBuild
             }
             else
             {
-                if (!SupportedPlatforms.Contains(Platform))
+                if (!SupportedPlatforms.Contains(Platform) && !LocallyBuiltPlatforms.Contains(Platform))
                 {
                     throw new Exception($"Platform {Platform} is unsupported");
                 }
@@ -243,6 +247,13 @@ class Build : NukeBuild
 
         if (!File.Exists(impellerHeaderPath))
         {
+            if (LocallyBuiltPlatforms.Contains(platform))
+            {
+                throw new Exception(
+                    $"Impeller header file not found at: {impellerHeaderPath}\n" +
+                    $"The {platform} SDK is not published by Flutter; build it with ./build-impeller-wasm.sh first.");
+            }
+
             throw new Exception(
                 $"Impeller header file not found at: {impellerHeaderPath}\n" +
                 $"Please download the {platform} Impeller SDK first by running the Nuke build task:\n" +

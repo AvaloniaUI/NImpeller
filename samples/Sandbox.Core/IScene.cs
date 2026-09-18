@@ -7,6 +7,13 @@ public class SceneParameters
     public int Complexity { get; set; } = 12;
     public int Width { get; set; }
     public int Height { get; set; }
+
+    /// <summary>
+    /// Typography context to lay out text with. When null, scenes create a throwaway context that
+    /// only sees the platform's system fonts. Hosts without system fonts (e.g. the browser) supply a
+    /// context with fonts registered up front.
+    /// </summary>
+    public ImpellerTypographyContext? TypographyContext { get; set; }
 }
 
 public interface IScene

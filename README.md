@@ -45,6 +45,20 @@ to download the newest Impeller build by the newest commit to Flutter, or
 
 For a specific commit.
 
+### WebAssembly
+
+This branch has a spike for hacking some support for Impeller to run with .NET. Some stuff could maybe be upstreamed, some not, but it runs.
+
+Access https://github.com/drasticactions/flutter/tree/nimpeller-wasm for a hacked-up test of Impeller WASM to allow it to (better) interoperate with .NET. Put it along side this branch. Then run.
+
+The clankered script will tell you what you need to build Impeller.
+
+```sh
+./build-impeller-wasm.sh                                   # -> external/impeller_sdk/wasm/lib/libimpeller.a
+./build.sh GenerateBindings --platform wasm
+dotnet publish samples/Sandbox.Web -c Release
+```
+
 ### Handles
 
 Native impeller handles are represented by two separate types:

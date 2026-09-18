@@ -84,4 +84,23 @@
             <TargetPath>libimpeller.so</TargetPath>
         </None>
     </ItemGroup>
+
+    <!-- Browser (wasm): there is no shared library to copy. The static archive is linked into
+         dotnet.native.wasm by the .NET wasm SDK instead. The SDK derives the P/Invoke module name
+         from the archive's file name, so it is staged as impeller.a to match [LibraryImport("impeller")]. -->
+    <PropertyGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+        <ImpellerWasmArchive>$(ImpellerSdkDirectory)\wasm\lib\libimpeller.a</ImpellerWasmArchive>
+        <!-- BaseIntermediateOutputPath (obj\) is already set here; IntermediateOutputPath is not. -->
+        <ImpellerWasmStagedArchive>$(MSBuildProjectDirectory)\$(BaseIntermediateOutputPath)impeller\impeller.a</ImpellerWasmStagedArchive>
+    </PropertyGroup>
+
+    <ItemGroup Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+        <NativeFileReference Include="$(ImpellerWasmStagedArchive)" />
+    </ItemGroup>
+
+    <Target Name="StageImpellerWasmArchive" BeforeTargets="PrepareForBuild" Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
+        <Error Condition="!Exists('$(ImpellerWasmArchive)')"
+               Text="Impeller wasm archive not found at $(ImpellerWasmArchive). Build it with ./build-impeller-wasm.sh." />
+        <Copy SourceFiles="$(ImpellerWasmArchive)" DestinationFiles="$(ImpellerWasmStagedArchive)" SkipUnchangedFiles="true" />
+    </Target>
 </Project>

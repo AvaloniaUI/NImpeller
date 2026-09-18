@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NImpeller on WebAssembly</title>
+  <style>
+    body { margin: 0; background: #202020; color: #ddd; font-family: system-ui, sans-serif; }
+    #canvas { display: block; margin: 16px auto; background: #000; }
+    #status { text-align: center; padding: 8px; }
+    a { color: #8cf; }
+  </style>
+</head>
+<body>
+  <div id="status">Loading .NET runtime…</div>
+  <canvas id="canvas" width="800" height="600"></canvas>
+  <div id="status-help">
+    Scenes: <a href="?scene=circlingsquares">circlingsquares</a> ·
+    <a href="?scene=gradients">gradients</a> ·
+    <a href="?scene=mmark">mmark</a> ·
+    <a href="?scene=paragraph">paragraph</a>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

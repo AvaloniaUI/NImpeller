@@ -12,7 +12,6 @@ public class ParagraphScene : IScene
     public string CommandLineName => "paragraph";
     public string Description => "Typography showcase with various font sizes, weights, alignments, decorations, and CJK text rendering";
 
-    Stopwatch st = Stopwatch.StartNew();
     public void Render(ImpellerContext context, ImpellerDisplayListBuilder scene, SceneParameters sceneParameters)
     {
         using var paint = ImpellerPaint.New();

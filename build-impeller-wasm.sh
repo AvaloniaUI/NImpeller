@@ -91,4 +91,8 @@ rm -rf "$SDK_OUT"
 mkdir -p "$SDK_OUT"
 unzip -q -o "out/$OUT_NAME/zip_archives/wasm/impeller_sdk.zip" -d "$SDK_OUT"
 
+# Merge the archive into one object and hide everything but the Impeller C API, so the bundled
+# Skia/HarfBuzz/ICU don't collide with other archives (SkiaSharp, HarfBuzzSharp) in the final link.
+"$SCRIPT_DIR/wasm-localize-archive.sh" "$SDK_OUT/lib/libimpeller.a" "$SDK_PACK/bin"
+
 echo "Wrote $SDK_OUT/lib/libimpeller.a ($(du -h "$SDK_OUT/lib/libimpeller.a" | cut -f1))"

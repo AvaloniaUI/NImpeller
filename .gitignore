@@ -4,7 +4,8 @@ obj/
 riderModule.iml
 /_ReSharper.Caches/
 .idea
-external/impeller_sdk
+/artifacts/
+external/depot_tools
 .DS_Store
 .nuke/temp/
 external/emsdk-dotnet-*

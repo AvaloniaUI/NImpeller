@@ -1,8 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.WebAssembly">
 
-  <!-- NImpeller in the browser: Impeller.targets links external/impeller_sdk/wasm/lib/libimpeller.a
-       (built by ../../build-impeller-wasm.sh) statically into dotnet.native.wasm; the app drives a
-       WebGL 2 canvas through Emscripten's GLES emulation. -->
+  <!-- NImpeller in the browser: Impeller.targets links artifacts/impeller/wasm/lib/libimpeller.a
+       statically into dotnet.native.wasm; the app drives a WebGL 2 canvas through Emscripten's GLES emulation. -->
   <Import Project="../Sandbox/Impeller.targets" />
 
   <PropertyGroup>

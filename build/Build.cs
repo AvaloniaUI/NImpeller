@@ -20,7 +20,7 @@ using static Nuke.Common.IO.PathConstruction;
 using static Nuke.Common.Tools.DotMemoryUnit.DotMemoryUnitTasks;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
-class Build : NukeBuild
+partial class Build : NukeBuild
 {
     /// Support plugins are available for:
     ///   - JetBrains ReSharper        https://nuke.build/resharper
@@ -58,18 +58,19 @@ class Build : NukeBuild
         "darwin-x64",
         "android-arm64",
         "android-arm",
-        "android-x86",
         "android-x64"
     };
 
-    // Platforms that have no prebuilt SDK on the Flutter feed but can be produced locally
-    // (see build-impeller-wasm.sh) and consumed by GenerateBindings.
+    // Skipped by --all.
+    static readonly string[] OptInPlatforms = { "android-arm" };
+
+    // No prebuilt SDK; BuildImpeller only.
     static readonly string[] LocallyBuiltPlatforms = { "wasm" };
 
     const string BaseUrl = "https://storage.googleapis.com/flutter_infra_release/flutter";
     const string EngineRepo = "https://github.com/flutter/flutter.git";
 
-    AbsolutePath OutputDirectory => RootDirectory / "external" / "impeller_sdk";
+    AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts" / "impeller";
 
     Target Clean => _ => _
         .Before(Restore)
@@ -100,10 +101,11 @@ class Build : NukeBuild
 
             if (All)
             {
-                foreach (var item in SupportedPlatforms)
-                {
-                    GenerateBindingsWithPlatform(Platform);
-                }
+                // Headers are identical; use the first one present.
+                var platform = SupportedPlatforms.Concat(LocallyBuiltPlatforms)
+                    .FirstOrDefault(p => File.Exists(ArtifactsDirectory / p / "include" / "impeller.h"))
+                    ?? throw new Exception($"No Impeller SDK found under {ArtifactsDirectory}. Run DownloadLatestImpeller or BuildImpeller first.");
+                GenerateBindingsWithPlatform(platform);
             }
             else
             {
@@ -218,7 +220,7 @@ class Build : NukeBuild
         var successCount = 0;
         var failCount = 0;
 
-        foreach (var platform in SupportedPlatforms)
+        foreach (var platform in SupportedPlatforms.Except(OptInPlatforms))
         {
             try
             {
@@ -243,7 +245,7 @@ class Build : NukeBuild
 
     void GenerateBindingsWithPlatform(string platform)
     {
-        var impellerHeaderPath = OutputDirectory / platform / "include" / "impeller.h";
+        var impellerHeaderPath = ArtifactsDirectory / platform / "include" / "impeller.h";
 
         if (!File.Exists(impellerHeaderPath))
         {
@@ -251,7 +253,8 @@ class Build : NukeBuild
             {
                 throw new Exception(
                     $"Impeller header file not found at: {impellerHeaderPath}\n" +
-                    $"The {platform} SDK is not published by Flutter; build it with ./build-impeller-wasm.sh first.");
+                    $"The {platform} SDK is not published by Flutter; build it first with:\n" +
+                    $"  BuildImpeller --platform {platform}");
             }
 
             throw new Exception(
@@ -259,7 +262,9 @@ class Build : NukeBuild
                 $"Please download the {platform} Impeller SDK first by running the Nuke build task:\n" +
                 $"  DownloadLatestImpeller --platform {platform}\n" +
                 "or\n" +
-                $"  DownloadImpeller --impeller-sha <commit-sha> --platform {platform}");
+                $"  DownloadImpeller --impeller-sha <commit-sha> --platform {platform}\n" +
+                "or build it from external/flutter:\n" +
+                $"  BuildImpeller --platform {platform}");
         }
 
         Log.Information("Found impeller.h at: {Path}", impellerHeaderPath);
@@ -294,7 +299,7 @@ class Build : NukeBuild
     async Task DownloadPlatformAsync(string sha, string platform)
     {
         var url = $"{BaseUrl}/{sha}/{platform}/impeller_sdk.zip";
-        var platformDir = OutputDirectory / platform;
+        var platformDir = ArtifactsDirectory / platform;
         var zipFile = platformDir / "impeller_sdk.zip";
 
         platformDir.CreateOrCleanDirectory();

@@ -6,7 +6,7 @@
         <IsWindows>$([MSBuild]::IsOSPlatform('Windows'))</IsWindows>
         <IsLinux>$([MSBuild]::IsOSPlatform('Linux'))</IsLinux>
         <IsOSX>$([MSBuild]::IsOSPlatform('OSX'))</IsOSX>
-        <ImpellerSdkDirectory>$(MSBuildThisFileDirectory)..\..\external\impeller_sdk</ImpellerSdkDirectory>
+        <ImpellerSdkDirectory>$(MSBuildThisFileDirectory)..\..\artifacts\impeller</ImpellerSdkDirectory>
         <IsArm64>false</IsArm64>
         <IsArm64 Condition="$(RuntimeIdentifier.Contains('arm64')) OR $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()) == 'Arm64'">true</IsArm64>
         <IsX64>false</IsX64>
@@ -100,7 +100,7 @@
 
     <Target Name="StageImpellerWasmArchive" BeforeTargets="PrepareForBuild" Condition="'$(RuntimeIdentifier)' == 'browser-wasm'">
         <Error Condition="!Exists('$(ImpellerWasmArchive)')"
-               Text="Impeller wasm archive not found at $(ImpellerWasmArchive). Build it with ./build-impeller-wasm.sh." />
+               Text="Impeller wasm archive not found at $(ImpellerWasmArchive). Build it with ./build.sh BuildImpeller --platform wasm." />
         <Copy SourceFiles="$(ImpellerWasmArchive)" DestinationFiles="$(ImpellerWasmStagedArchive)" SkipUnchangedFiles="true" />
     </Target>
 </Project>

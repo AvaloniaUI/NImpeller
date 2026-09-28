@@ -6,13 +6,11 @@ Generated bindings file is NOT checked out into the repo, because right now the 
 
 ### Running this thing
 
-1) Generate the Impeller bindings. If you have never generated the bindings, they will be generated on first build of NImpeller via an MSBuild task. You should see this as `DownloadSdkAndGenerateBindings`. You can also use the InteropGen program directly with the `impeller.h` header, or use the Nuke task
+1) Download or build an SDK (see below), then generate bindings:
 
 ```sh
-./build.sh GenerateBindings
+./build.sh GenerateBindings --platform linux-x64
 ```
-
-to automatically download and build the bindings.
 
 2) Run the Sandbox sample. The runtime file used is based on the `Impeller.targets` file. You can either manually set up the library you want to test with, or use the Nuke tasks below for automatically setting it up per commit, or with the latest commit. 
 
@@ -43,19 +41,26 @@ to download the newest Impeller build by the newest commit to Flutter, or
 ./build.sh DownloadImpeller --impeller-sha (Commit Sha) --All
 ```
 
-For a specific commit.
+For a specific commit. SDKs go to `artifacts/impeller/<platform>/`.
+
+### Building Impeller from source
+
+Flutter is a submodule at `external/flutter` (the drasticactions fork, `nimpeller-wasm` branch).
+
+```sh
+./build.sh BuildImpeller --platform linux-x64     # or --all; --impeller-runtime-mode debug|profile
+```
+
+This syncs engine deps (first sync is tens of GB; `--sync` forces one), builds the SDK into `artifacts/impeller/<platform>/` and regenerates bindings. `--all` builds what this host can, except the opt-in `android-arm`.
 
 ### WebAssembly
 
 This branch has a spike for hacking some support for Impeller to run with .NET. Some stuff could maybe be upstreamed, some not, but it runs.
 
-Access https://github.com/drasticactions/flutter/tree/nimpeller-wasm for a hacked-up test of Impeller WASM to allow it to (better) interoperate with .NET. Put it along side this branch. Then run.
-
-The clankered script will tell you what you need to build Impeller.
+Needs a Linux or macOS host and the `wasm-tools-net10` workload.
 
 ```sh
-./build-impeller-wasm.sh                                   # -> external/impeller_sdk/wasm/lib/libimpeller.a
-./build.sh GenerateBindings --platform wasm
+./build.sh BuildImpeller --platform wasm                   # -> artifacts/impeller/wasm/lib/libimpeller.a
 dotnet publish samples/Sandbox.Web -c Release
 ```
 

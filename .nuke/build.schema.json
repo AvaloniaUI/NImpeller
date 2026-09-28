@@ -24,13 +24,15 @@
     "ExecutableTarget": {
       "type": "string",
       "enum": [
+        "BuildImpeller",
         "Clean",
         "Compile",
         "DownloadImpeller",
         "DownloadLatestImpeller",
         "GenerateBindings",
         "ListImpellerCommits",
-        "Restore"
+        "Restore",
+        "SyncFlutter"
       ]
     },
     "Verbosity": {
@@ -116,9 +118,17 @@
             "Release"
           ]
         },
+        "EmscriptenVersion": {
+          "type": "string",
+          "description": "Emscripten version of the .NET wasm-tools packs used for the wasm build - Default is 3.1.56"
+        },
         "Extract": {
           "type": "boolean",
           "description": "Extract downloaded files"
+        },
+        "ImpellerRuntimeMode": {
+          "type": "string",
+          "description": "Engine runtime mode for BuildImpeller: release (default), profile or debug"
         },
         "ImpellerSha": {
           "type": "string",
@@ -131,6 +141,10 @@
         "Platform": {
           "type": "string",
           "description": "Platform to download (linux-x64, darwin-arm64, etc.)"
+        },
+        "Sync": {
+          "type": "boolean",
+          "description": "Force a gclient sync of external/flutter, even if the sync stamp is current"
         }
       }
     },

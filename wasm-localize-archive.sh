@@ -2,7 +2,7 @@
 #
 # Rewrites a wasm libimpeller.a in place so it exports only the Impeller C API: the members are
 # merged into a single relocatable object and every other defined symbol is made local (see
-# wasm-localize-symbols.py). Run by build-impeller-wasm.sh; can also be applied to an existing
+# wasm-localize-symbols.py). Run by `./build.sh BuildImpeller --platform wasm`; can also be applied to an existing
 # archive, and is idempotent.
 #
 # Usage: ./wasm-localize-archive.sh <libimpeller.a> [<llvm bin dir>]

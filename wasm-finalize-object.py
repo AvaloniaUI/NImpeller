@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""Rewrites a relocatable wasm object so that every defined symbol outside the Impeller C API is
-BINDING_LOCAL, and drops its COMDAT table.
+"""Rewrites a relocatable wasm object so that every defined symbol outside the export list is
+BINDING_LOCAL, and drops its COMDAT table. Run by `./build.sh BuildImpeller --platform wasm` on the
+LTO object of a throwaway wasm-ld link.
 
 libimpeller.a statically bundles Skia, HarfBuzz, ICU, wuffs, ... whose global symbols collide with
-other archives an app links (SkiaSharp, HarfBuzzSharp). wasm-ld has neither --exclude-libs nor
---allow-multiple-definition and llvm-objcopy ignores symbol operations for wasm, so the `linking`
-section is patched directly:
+other archives an app links (SkiaSharp, HarfBuzzSharp). LTO internalizes most of them, but keeps
+runtime symbols global. llvm-objcopy ignores symbol operations for wasm, so the `linking` section is
+patched directly:
 
 * the symbol table's binding field (low two bits of the flags) is set to local, and
 * the COMDAT subsection is removed — the merged object is already deduplicated internally, and
   keeping the groups would make wasm-ld discard same-named COMDATs (template instantiations) in
   other objects in favour of the now-local copies here.
 
-usage: wasm-localize-symbols.py <in.o> <out.o> [keep-prefix ...]   (default prefix: Impeller)
+usage: wasm-finalize-object.py <in.o> <out.o> <exports.txt>
+
+Fails if a listed export isn't defined.
 """
 import sys
 
@@ -67,11 +70,12 @@ def find_linking(buf):
     raise SystemExit("no linking section: input must be a relocatable object (wasm-ld -r)")
 
 
-def localize_symtab(sub, keep_prefixes):
-    """Patches bindings in a symbol table subsection payload in place; returns (count, localized, kept)."""
+def localize_symtab(sub, keep):
+    """Patches bindings in a symbol table subsection payload in place; returns (count, localized, kept names)."""
     pos = 0
     count, pos = read_leb(sub, pos)
-    localized = kept = 0
+    localized = 0
+    kept = set()
     for _ in range(count):
         kind = sub[pos]
         pos += 1
@@ -81,7 +85,7 @@ def localize_symtab(sub, keep_prefixes):
         name = None
         if kind == KIND_DATA:
             name_len, pos = read_leb(sub, pos)
-            name = sub[pos:pos + name_len]
+            name = bytes(sub[pos:pos + name_len])
             pos += name_len
             if defined:
                 for _ in range(3):  # segment index, offset, size
@@ -92,24 +96,24 @@ def localize_symtab(sub, keep_prefixes):
             _, pos = read_leb(sub, pos)
             if defined or flags & EXPLICIT_NAME:
                 name_len, pos = read_leb(sub, pos)
-                name = sub[pos:pos + name_len]
+                name = bytes(sub[pos:pos + name_len])
                 pos += name_len
         if not defined or flags & BINDING_MASK == BINDING_LOCAL or name is None:
             continue
-        if any(name.startswith(prefix) for prefix in keep_prefixes):
-            kept += 1
+        if name in keep:
+            kept.add(name)
             continue
         sub[flags_pos] = (sub[flags_pos] & ~BINDING_MASK) | BINDING_LOCAL
         localized += 1
     return count, localized, kept
 
 
-def rewrite(buf, keep_prefixes):
+def rewrite(buf, keep):
     start, pos, end = find_linking(buf)
     version_start = pos
     _version, pos = read_leb(buf, pos)
     payload = bytearray(buf[version_start:pos])
-    stats = (0, 0, 0)
+    stats = (0, 0, set())
     comdats = 0
     while pos < end:
         sub_type = buf[pos]
@@ -121,7 +125,7 @@ def rewrite(buf, keep_prefixes):
             comdats, _ = read_leb(sub, 0)
             continue
         if sub_type == SYMTAB_SUBSECTION:
-            stats = localize_symtab(sub, keep_prefixes)
+            stats = localize_symtab(sub, keep)
         payload += bytes([sub_type]) + write_leb(len(sub)) + sub
     name = write_leb(len(b"linking")) + b"linking"
     section = bytes([0]) + write_leb(len(name) + len(payload)) + name + payload
@@ -129,13 +133,16 @@ def rewrite(buf, keep_prefixes):
 
 
 def main():
-    if len(sys.argv) < 3:
+    if len(sys.argv) != 4:
         raise SystemExit(__doc__)
-    keep = [p.encode() for p in (sys.argv[3:] or ["Impeller"])]
+    keep = {line.strip().encode() for line in open(sys.argv[3]) if line.strip()}
     buf = bytearray(open(sys.argv[1], "rb").read())
     out, (count, localized, kept), comdats = rewrite(buf, keep)
+    missing = sorted(n.decode() for n in keep - kept)
+    if missing:
+        raise SystemExit(f"{sys.argv[1]}: {len(missing)} exports aren't defined: {', '.join(missing[:20])}")
     open(sys.argv[2], "wb").write(out)
-    print(f"{sys.argv[2]}: {count} symbols, {localized} localized, {kept} kept global, "
+    print(f"{sys.argv[2]}: {count} symbols, {localized} localized, {len(kept)} kept global, "
           f"{comdats} COMDAT groups dropped")
 
 

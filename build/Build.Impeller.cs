@@ -258,13 +258,12 @@ partial class Build
         }
 
         var ninjaTarget = "flutter/impeller/toolkit/interop:sdk";
-        string emscriptenBin = null;
         var cpu = platform.Split('-').Last();
 
         switch (platform.Split('-')[0])
         {
             case "wasm":
-                emscriptenBin = SetupEmscriptenShim(out var shimDir);
+                SetupEmscriptenShim(out var shimDir);
                 gnArgs.AddRange(new[] { "--wasm", "--gn-args", $"emsdk_dir=\"{shimDir}\"" });
                 ninjaTarget = "flutter/wasm:impeller_sdk";
                 break;
@@ -296,44 +295,40 @@ partial class Build
         platformDir.CreateOrCleanDirectory();
         ZipFile.ExtractToDirectory(zip, platformDir);
 
-        if (platform == "wasm")
-        {
-            // Hide non-Impeller symbols to avoid clashes with SkiaSharp/HarfBuzzSharp.
-            Run("bash", new string[] { RootDirectory / "wasm-localize-archive.sh", platformDir / "lib" / "libimpeller.a", emscriptenBin }, RootDirectory);
-        }
+        // Export only the C API, so the archive links next to SkiaSharp/HarfBuzzSharp and into NativeAOT apps.
+        InternalizeStaticLibrary(platform, platformDir, outDir / "nimpeller_internalize");
 
         Log.Information("Wrote {Platform} SDK to {Directory}", platform, platformDir);
     }
 
-    // Fake emsdk dir over the .NET Emscripten packs, so the ABI matches dotnet publish. Returns the LLVM bin dir.
-    string SetupEmscriptenShim(out AbsolutePath shimDir)
+    // The latest stable version of a .NET Emscripten pack ("Sdk", "Node", "Cache"); returns its tools dir.
+    AbsolutePath EmscriptenPack(string name)
     {
         var dotnetRoot = Environment.GetEnvironmentVariable("DOTNET_ROOT") is { Length: > 0 } root
             ? (AbsolutePath)root
             : (AbsolutePath)Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) / ".dotnet";
         var rid = (IsMacHost ? "osx-" : "linux-") + HostCpu;
-        var packBase = $"Microsoft.NET.Runtime.Emscripten.{EmscriptenVersion}";
-
-        AbsolutePath LatestPack(string name)
+        var dir = dotnetRoot / "packs" / $"Microsoft.NET.Runtime.Emscripten.{EmscriptenVersion}.{name}.{rid}";
+        if (!Directory.Exists(dir))
         {
-            var dir = dotnetRoot / "packs" / $"{packBase}.{name}.{rid}";
-            if (!Directory.Exists(dir))
-            {
-                throw new Exception($"Missing .NET pack {dir}. Install the workload: dotnet workload install wasm-tools-net10");
-            }
-
-            // Prefer stable versions.
-            var versions = Directory.GetDirectories(dir).Select(Path.GetFileName).ToArray();
-            var stable = versions.Where(v => !v.Contains('-')).ToArray();
-            var version = (stable.Length > 0 ? stable : versions)
-                .OrderBy(v => Version.TryParse(v.Split('-')[0], out var parsed) ? parsed : new Version())
-                .Last();
-            return dir / version / "tools";
+            throw new Exception($"Missing .NET pack {dir}. Install the workload: dotnet workload install wasm-tools-net10");
         }
 
-        var sdkPack = LatestPack("Sdk");
-        var nodePack = LatestPack("Node");
-        var cachePack = LatestPack("Cache");
+        // Prefer stable versions.
+        var versions = Directory.GetDirectories(dir).Select(Path.GetFileName).ToArray();
+        var stable = versions.Where(v => !v.Contains('-')).ToArray();
+        var version = (stable.Length > 0 ? stable : versions)
+            .OrderBy(v => Version.TryParse(v.Split('-')[0], out var parsed) ? parsed : new Version())
+            .Last();
+        return dir / version / "tools";
+    }
+
+    // Fake emsdk dir over the .NET Emscripten packs, so the ABI matches dotnet publish.
+    void SetupEmscriptenShim(out AbsolutePath shimDir)
+    {
+        var sdkPack = EmscriptenPack("Sdk");
+        var nodePack = EmscriptenPack("Node");
+        var cachePack = EmscriptenPack("Cache");
         Log.Information("Emscripten: {Path}", sdkPack);
 
         shimDir = RootDirectory / "external" / $"emsdk-dotnet-{EmscriptenVersion}";
@@ -359,8 +354,6 @@ partial class Build
             JS_ENGINES = [NODE_JS]
 
             """);
-
-        return sdkPack / "bin";
     }
 
     Dictionary<string, string> ToolEnvironment()

@@ -30,6 +30,7 @@
         "DownloadImpeller",
         "DownloadLatestImpeller",
         "GenerateBindings",
+        "InternalizeImpeller",
         "ListImpellerCommits",
         "Restore",
         "SyncFlutter"

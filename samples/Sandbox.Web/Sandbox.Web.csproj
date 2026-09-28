@@ -35,6 +35,20 @@
     <EmbeddedResource Include="Assets/NotoSans-Regular.ttf" LogicalName="NotoSans-Regular.ttf" />
   </ItemGroup>
 
+  <!-- -p:NImpellerSkiaCheck=true links SkiaSharp and HarfBuzzSharp into the same dotnet.native.wasm and
+       checks them at startup (Avalonia's versions). -->
+  <PropertyGroup Condition="'$(NImpellerSkiaCheck)' == 'true'">
+    <DefineConstants>$(DefineConstants);NIMPELLER_SKIA_CHECK</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(NImpellerSkiaCheck)' == 'true'">
+    <Compile Include="../StaticSmoke/SkiaChecks.cs" />
+    <PackageReference Include="SkiaSharp" Version="4.148.0" />
+    <PackageReference Include="SkiaSharp.NativeAssets.WebAssembly" Version="4.148.0" />
+    <PackageReference Include="HarfBuzzSharp" Version="8.3.1.3" />
+    <PackageReference Include="HarfBuzzSharp.NativeAssets.WebAssembly" Version="8.3.1.3" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../../src/NImpeller/NImpeller.csproj" />
     <ProjectReference Include="../Sandbox.Core/Sandbox.Core.csproj" />

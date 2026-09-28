@@ -53,6 +53,33 @@ Flutter is a submodule at `external/flutter` (the drasticactions fork, `nimpelle
 
 This syncs engine deps (first sync is tens of GB; `--sync` forces one), builds the SDK into `artifacts/impeller/<platform>/` and regenerates bindings. `--all` builds what this host can, except the opt-in `android-arm`.
 
+#### Static library
+
+In a built SDK, `lib/libimpeller.a` is one object (`impeller.o`) whose only global symbols are the C API. Skia, HarfBuzz, ICU, libc++ and the rest are local, so the archive links next to SkiaSharp/HarfBuzzSharp and into NativeAOT apps. `BuildImpeller` does this with a throwaway LTO link (`build/Build.Internalize.cs`); `lib/impeller.undefined.txt` lists the system symbols it needs. Debug SDKs have no static archive. Mach-O (macOS) and COFF (Windows, `impeller_static.lib`) aren't done yet; those builds drop the archive.
+
+To link it into a NativeAOT app, import `Impeller.targets` and publish with a runtime identifier:
+
+```xml
+<PublishAot>true</PublishAot>
+<ImpellerLinkMode>Static</ImpellerLinkMode>
+```
+
+`samples/StaticSmoke` does this next to SkiaSharp and HarfBuzzSharp: `dotnet publish samples/StaticSmoke -c Release -r linux-x64`.
+
+#### Requirements
+
+| Need | Used by | Source |
+|---|---|---|
+| .NET SDK 10.0.4xx | everything | pinned by `global.json` |
+| Flutter buildtools clang (lld, llvm-objcopy, llvm-ar, llvm-nm) | native builds, internalization | `gclient sync` |
+| Android NDK 28.2 | android builds | `gclient sync` |
+| .NET Emscripten 3.1.56 packs | wasm build, internalization | `dotnet workload install wasm-tools` |
+| Xcode + macOS SDK | darwin builds | macOS host |
+| MSVC + Windows SDK | windows builds | Windows host |
+| qemu-user + aarch64 glibc sysroot | running linux-arm64 smoke tests on x64 | distro packages |
+| Android emulator + x86_64 system image, Java 17+ | running android-x64 smoke tests | `sdkmanager` (separate SDK root) |
+| Playwright + Chromium/Firefox | `samples/Sandbox.Web/test/smoke.mjs` | `npm install playwright && npx playwright install chromium firefox` |
+
 ### WebAssembly
 
 This branch has a spike for hacking some support for Impeller to run with .NET. Some stuff could maybe be upstreamed, some not, but it runs.
@@ -62,6 +89,12 @@ Needs a Linux or macOS host and the `wasm-tools-net10` workload.
 ```sh
 ./build.sh BuildImpeller --platform wasm                   # -> artifacts/impeller/wasm/lib/libimpeller.a
 dotnet publish samples/Sandbox.Web -c Release
+```
+
+`-p:NImpellerSkiaCheck=true` also links SkiaSharp and HarfBuzzSharp into the app and checks them at startup. To run every scene in Chromium and Firefox (headless Firefox may have no WebGL, hence `--headed` under xvfb):
+
+```sh
+xvfb-run -a node samples/Sandbox.Web/test/smoke.mjs samples/Sandbox.Web/bin/Release/net10.0-browser/publish/wwwroot --headed
 ```
 
 ### Handles

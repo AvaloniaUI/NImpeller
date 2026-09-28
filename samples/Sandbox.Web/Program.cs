@@ -44,6 +44,38 @@ public static partial class WebApp
     private static partial void SetStatus(string text);
 
     [JSExport]
+    public static string[] SceneNames() => Scenes.Select(s => s.CommandLineName).ToArray();
+
+    [JSExport]
+    public static void SetScene(string sceneName)
+    {
+        _scene = Scenes.First(s => s.CommandLineName.Equals(sceneName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// With -p:NImpellerSkiaCheck=true, SkiaSharp and HarfBuzzSharp are linked into the same
+    /// dotnet.native.wasm as Impeller; this checks that both still work next to it.
+    /// </summary>
+    [JSExport]
+    public static bool RunStartupChecks()
+    {
+#if NIMPELLER_SKIA_CHECK
+        return StaticSmoke.SkiaChecks.Run(LoadFont(), Console.WriteLine);
+#else
+        return true;
+#endif
+    }
+
+    private static byte[] LoadFont()
+    {
+        using var stream = typeof(WebApp).Assembly.GetManifestResourceStream("NotoSans-Regular.ttf")
+                           ?? throw new InvalidOperationException("Embedded font resource missing.");
+        var bytes = new byte[stream.Length];
+        stream.ReadExactly(bytes);
+        return bytes;
+    }
+
+    [JSExport]
     public static bool Initialize(string canvasSelector, int width, int height, string sceneName)
     {
         _width = width;
@@ -83,11 +115,7 @@ public static partial class WebApp
     private static ImpellerTypographyContext CreateTypographyContext()
     {
         var typography = ImpellerTypographyContext.New()!;
-
-        using var stream = typeof(WebApp).Assembly.GetManifestResourceStream("NotoSans-Regular.ttf")
-                           ?? throw new InvalidOperationException("Embedded font resource missing.");
-        var bytes = new byte[stream.Length];
-        stream.ReadExactly(bytes);
+        var bytes = LoadFont();
 
         // RegisterFont copies the bytes, so one buffer serves both registrations.
         using var memory = new ImpellerUnmanagedMemory(bytes);

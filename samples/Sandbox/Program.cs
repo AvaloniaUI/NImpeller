@@ -54,6 +54,8 @@ static class Program
         public WindowBackend Backend { get; set; }
     }
 
+    // CommandLineParser reflects over Options; keep it when trimmed (PublishAot).
+    [System.Diagnostics.CodeAnalysis.DynamicDependency(System.Diagnostics.CodeAnalysis.DynamicallyAccessedMemberTypes.All, typeof(Options))]
     static void Main(string[] args)
     {
         // Configure logging

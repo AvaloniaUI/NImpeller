@@ -11,9 +11,14 @@
         <IsArm64 Condition="$(RuntimeIdentifier.Contains('arm64')) OR $([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()) == 'Arm64'">true</IsArm64>
         <IsX64>false</IsX64>
         <IsX64 Condition="$(RuntimeIdentifier.Contains('x64')) OR ($([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()) == 'X64' AND '$(IsArm64)' == 'false')">true</IsX64>
+        <!-- ImpellerLinkMode=Static: NativeAOT links lib/libimpeller.a (impeller_static.lib on Windows) into the executable. -->
+        <ImpellerStaticLink>false</ImpellerStaticLink>
+        <ImpellerStaticLink Condition="'$(ImpellerLinkMode)' == 'Static' AND '$(PublishAot)' == 'true'">true</ImpellerStaticLink>
+        <ImpellerCopySharedLibrary>true</ImpellerCopySharedLibrary>
+        <ImpellerCopySharedLibrary Condition="'$(ImpellerStaticLink)' == 'true' AND '$(_IsPublishing)' == 'true'">false</ImpellerCopySharedLibrary>
     </PropertyGroup>
     
-    <ItemGroup Condition="$(TargetFramework.Contains('-windows')) == true AND '$(IsArm64)' == 'true'">
+    <ItemGroup Condition="$(ImpellerCopySharedLibrary) AND $(TargetFramework.Contains('-windows')) == true AND '$(IsArm64)' == 'true'">
         <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-arm64\lib\impeller.dll">
             <Pack>true</Pack>
             <PackageCopyToOutput>true</PackageCopyToOutput>
@@ -22,7 +27,7 @@
         </None>
     </ItemGroup>
     
-    <ItemGroup Condition="$(TargetFramework.Contains('-windows')) == true AND '$(IsArm64)' == 'false'">
+    <ItemGroup Condition="$(ImpellerCopySharedLibrary) AND $(TargetFramework.Contains('-windows')) == true AND '$(IsArm64)' == 'false'">
         <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-x64\lib\impeller.dll">
             <Pack>true</Pack>
             <PackageCopyToOutput>true</PackageCopyToOutput>
@@ -31,7 +36,7 @@
         </None>
     </ItemGroup>
     
-    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsWindows) AND '$(IsArm64)' == 'true'">
+    <ItemGroup Condition="$(ImpellerCopySharedLibrary) AND $(TargetFramework.Contains('-')) == false AND $(IsWindows) AND '$(IsArm64)' == 'true'">
         <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-arm64\lib\impeller.dll">
             <Pack>true</Pack>
             <PackageCopyToOutput>true</PackageCopyToOutput>
@@ -40,7 +45,7 @@
         </None>
     </ItemGroup>
     
-    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsWindows) AND '$(IsArm64)' == 'false'">
+    <ItemGroup Condition="$(ImpellerCopySharedLibrary) AND $(TargetFramework.Contains('-')) == false AND $(IsWindows) AND '$(IsArm64)' == 'false'">
         <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-x64\lib\impeller.dll">
             <Pack>true</Pack>
             <PackageCopyToOutput>true</PackageCopyToOutput>
@@ -49,7 +54,7 @@
         </None>
     </ItemGroup>
     
-    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsOSX) AND '$(IsArm64)' == 'true'">
+    <ItemGroup Condition="$(ImpellerCopySharedLibrary) AND $(TargetFramework.Contains('-')) == false AND $(IsOSX) AND '$(IsArm64)' == 'true'">
         <None Visible="false" Include="$(ImpellerSdkDirectory)\darwin-arm64\lib\libimpeller.dylib">
             <Pack>true</Pack>
             <PackageCopyToOutput>true</PackageCopyToOutput>
@@ -58,7 +63,7 @@
         </None>
     </ItemGroup>
 
-    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsOSX) AND '$(IsArm64)' == 'false'">
+    <ItemGroup Condition="$(ImpellerCopySharedLibrary) AND $(TargetFramework.Contains('-')) == false AND $(IsOSX) AND '$(IsArm64)' == 'false'">
         <None Visible="false" Include="$(ImpellerSdkDirectory)\darwin-x64\lib\libimpeller.dylib">
             <Pack>true</Pack>
             <PackageCopyToOutput>true</PackageCopyToOutput>
@@ -67,7 +72,7 @@
         </None>
     </ItemGroup>
     
-    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsLinux) AND '$(IsArm64)' == 'true'">
+    <ItemGroup Condition="$(ImpellerCopySharedLibrary) AND $(TargetFramework.Contains('-')) == false AND $(IsLinux) AND '$(IsArm64)' == 'true'">
         <None Visible="false" Include="$(ImpellerSdkDirectory)\linux-arm64\lib\libimpeller.so">
             <Pack>true</Pack>
             <PackageCopyToOutput>true</PackageCopyToOutput>
@@ -76,7 +81,7 @@
         </None>
     </ItemGroup>
     
-    <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsLinux) AND '$(IsArm64)' == 'false'">
+    <ItemGroup Condition="$(ImpellerCopySharedLibrary) AND $(TargetFramework.Contains('-')) == false AND $(IsLinux) AND '$(IsArm64)' == 'false'">
         <None Visible="false" Include="$(ImpellerSdkDirectory)\linux-x64\lib\libimpeller.so">
             <Pack>true</Pack>
             <PackageCopyToOutput>true</PackageCopyToOutput>
@@ -84,6 +89,28 @@
             <TargetPath>libimpeller.so</TargetPath>
         </None>
     </ItemGroup>
+
+    <PropertyGroup Condition="$(ImpellerStaticLink)">
+        <ImpellerStaticPlatform Condition="$(RuntimeIdentifier.StartsWith('linux-bionic-'))">$(RuntimeIdentifier.Replace('linux-bionic-', 'android-'))</ImpellerStaticPlatform>
+        <ImpellerStaticPlatform Condition="'$(ImpellerStaticPlatform)' == '' AND $(RuntimeIdentifier.StartsWith('osx-'))">$(RuntimeIdentifier.Replace('osx-', 'darwin-'))</ImpellerStaticPlatform>
+        <ImpellerStaticPlatform Condition="'$(ImpellerStaticPlatform)' == '' AND $(RuntimeIdentifier.StartsWith('win-'))">$(RuntimeIdentifier.Replace('win-', 'windows-'))</ImpellerStaticPlatform>
+        <ImpellerStaticPlatform Condition="'$(ImpellerStaticPlatform)' == ''">$(RuntimeIdentifier)</ImpellerStaticPlatform>
+        <ImpellerStaticLibrary Condition="$(RuntimeIdentifier.StartsWith('win-'))">$(ImpellerSdkDirectory)\$(ImpellerStaticPlatform)\lib\impeller_static.lib</ImpellerStaticLibrary>
+        <ImpellerStaticLibrary Condition="!$(RuntimeIdentifier.StartsWith('win-'))">$(ImpellerSdkDirectory)\$(ImpellerStaticPlatform)\lib\libimpeller.a</ImpellerStaticLibrary>
+    </PropertyGroup>
+
+    <ItemGroup Condition="$(ImpellerStaticLink)">
+        <DirectPInvoke Include="impeller" />
+        <NativeLibrary Include="$(ImpellerStaticLibrary)" />
+        <!-- System libraries from lib/impeller.undefined.txt that NativeAOT doesn't link itself. -->
+        <LinkerArg Include="-llog" Condition="$(ImpellerStaticPlatform.StartsWith('android-'))" />
+    </ItemGroup>
+
+    <Target Name="CheckImpellerStaticLibrary" BeforeTargets="LinkNative" Condition="$(ImpellerStaticLink)">
+        <Error Condition="'$(RuntimeIdentifier)' == ''" Text="ImpellerLinkMode=Static needs a RuntimeIdentifier." />
+        <Error Condition="!Exists('$(ImpellerStaticLibrary)')"
+               Text="Impeller static library not found at $(ImpellerStaticLibrary). Build it with ./build.sh BuildImpeller --platform $(ImpellerStaticPlatform) (release or profile; debug SDKs have none)." />
+    </Target>
 
     <!-- Browser (wasm): there is no shared library to copy. The static archive is linked into
          dotnet.native.wasm by the .NET wasm SDK instead. The SDK derives the P/Invoke module name

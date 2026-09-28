@@ -1,0 +1,3 @@
+Roboto-Regular.ttf and Roboto-Medium.ttf: Roboto, Apache License 2.0.
+RobotoSlab-VariableFont_wght.ttf: Roboto Slab, SIL Open Font License 1.1.
+Copied from flutter/txt/third_party/fonts, where the Flutter engine uses them as test fixtures.

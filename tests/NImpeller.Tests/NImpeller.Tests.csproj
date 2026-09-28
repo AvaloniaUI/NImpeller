@@ -45,7 +45,7 @@
 
   <!-- Test fonts/fixtures are needed at runtime (e.g. the custom-font golden). -->
   <ItemGroup>
-    <None Update="Assets/Ahem.ttf">
+    <None Update="Assets/*.ttf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>

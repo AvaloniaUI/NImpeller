@@ -126,6 +126,9 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
         Invoke(() => RenderToFbo(width, height,
             builder => scene.Render(_impeller, builder, new SceneParameters { Width = width, Height = height })));
 
+    /// <summary>Runs <paramref name="fn"/> on the GL thread with the Impeller context current.</summary>
+    public T Run<T>(Func<ImpellerContext, T> fn) => Invoke(() => fn(_impeller));
+
     public TextureInteropResult RenderTextureInterop(int width, int height) =>
         Invoke(() => RenderTextureInteropCore(width, height));
 

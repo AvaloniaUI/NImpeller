@@ -24,6 +24,9 @@ public sealed class ImpellerGLFixture : IDisposable
         return (new RawImage(width, height, result.Pixels), result.CreatedHandle, result.ReportedHandle);
     }
 
+    /// <summary>Runs <paramref name="fn"/> on the GL thread with the Impeller context current.</summary>
+    public T Run<T>(Func<ImpellerContext, T> fn) => _context.Run(fn);
+
     public void Dispose() => _context.Dispose();
 }
 

@@ -270,6 +270,8 @@ partial class Build
             case "linux":
                 if (cpu != "x64")
                     gnArgs.AddRange(new[] { "--linux", "--linux-cpu", cpu });
+                // System font matching (ImpellerTypographyContextMatch*).
+                gnArgs.Add("--enable-fontconfig");
                 break;
             case "darwin":
                 gnArgs.AddRange(new[] { "--mac", "--mac-cpu", cpu });

@@ -39,6 +39,7 @@ class Generator
             "ImpellerTypefaceCopyData",
             "ImpellerTypefaceCopyFamilyName",
             "ImpellerTypographyContextCopyFamilyName",
+            "ImpellerTypographyContextCopyFamilyStyles",
             "ImpellerFontGetGlyphBounds",
             "ImpellerDisplayListBuilderDrawGlyphs",
             "ImpellerImageDecoderNew",

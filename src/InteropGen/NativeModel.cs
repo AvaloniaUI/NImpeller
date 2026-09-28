@@ -7,11 +7,12 @@ namespace InteropGen;
 
 class NativeType
 {
-    public bool IsString => NativeNullableType.Unwrap(this) is NativePointerType { Level: 1 } pt
+    // Only const char* is an input string; char* is an output buffer.
+    public bool IsString => NativeNullableType.Unwrap(this) is NativePointerType { Level: 1, IsConst: true } pt
                             && NativeNullableType.Unwrap(pt.ElementType) is NativePrimitiveType { DotnetType: "sbyte" };
     
     public bool IsGenericDataPointer => NativeNullableType.Unwrap(this) is NativePointerType { Level: 1 } pt
-                            && NativeNullableType.Unwrap(pt.ElementType) is NativePrimitiveType { DotnetType: "byte" };
+                            && NativeNullableType.Unwrap(pt.ElementType) is NativePrimitiveType { DotnetType: "byte", IsBool: false };
     
     public bool IsVoidPtr => NativeNullableType.Unwrap(this) is NativePointerType { Level: 1 } pt
     && NativeNullableType.Unwrap(pt.ElementType) is NativePrimitiveType { DotnetType: "void" };
@@ -37,9 +38,14 @@ class NativePointerType(NativeType inner, int level, bool isConst = false) : Nat
     public bool IsConst => isConst;
 }
 
-class NativePrimitiveType(string dotnetType) : NativeType
+class NativePrimitiveType(string dotnetType, bool isBool = false) : NativeType
 {
     public string DotnetType => dotnetType;
+
+    /// <summary>C <c>bool</c>: one byte in native code, <c>bool</c> in the managed API.</summary>
+    public bool IsBool => isBool;
+
+    public static readonly NativePrimitiveType Bool = new("byte", true);
 
     public static Dictionary<CppPrimitiveKind, NativePrimitiveType> Map = new()
     {
@@ -162,6 +168,8 @@ class NativeModel
         
         if (_typeMap.TryGetValue(type, out var mapped))
             return mapped;
+        if (type is CppTypedef { Name: "bool" })
+            return NativePrimitiveType.Bool;
         if (type is CppTypedef td)
             return MapType(td.ElementType);
         if (type is CppPrimitiveType primitiveType)
@@ -189,6 +197,15 @@ class NativeModel
 
         
         throw new Exception("Unknown type " + type);
+    }
+
+    // Only strings carry parameter nullability, so a null family name can be passed.
+    private NativeType MapParameterType(CppParameter parameter)
+    {
+        var type = MapType(parameter.Type);
+        if (type.IsString && parameter.Attributes.Any(x => x.Name == "annotate" && x.Arguments.Contains("nullable")))
+            return new NativeNullableType(type, true);
+        return type;
     }
 
     private NativeType MapType(CppType type, ICppAttributeContainer nullableAttributeSource)
@@ -291,14 +308,26 @@ class NativeModel
             {
                 Name = f.Name,
                 ReturnType = MapType(f.ReturnType, f),
-                Parameters = f.Parameters.Select(p => new NativeVar(p.Name, MapType(p.Type))).ToList()
+                Parameters = f.Parameters.Select(p => new NativeVar(p.Name, MapParameterType(p))).ToList()
             });
         }
         
         foreach (var f in Functions)
         {
 
-            if (f.Parameters.FirstOrDefault()?.Type is {} firstParameterType
+            // ImpellerPathMeasureNew(ImpellerPath) constructs an ImpellerPathMeasure, not an
+            // ImpellerPath method: the returned handle is the longer name prefix.
+            if (NativeNullableType.Unwrap(f.ReturnType) is NativeHandle constructed
+                && f.Name.EndsWith("New")
+                && f.Name.StartsWith(constructed.Name)
+                && f.Parameters.FirstOrDefault()?.Type is { } firstType
+                && NativeNullableType.Unwrap(firstType) is NativeHandle firstHandle
+                && constructed.Name.Length > firstHandle.Name.Length
+                && constructed.Name.StartsWith(firstHandle.Name))
+            {
+                constructed.Factories.Add(f);
+            }
+            else if (f.Parameters.FirstOrDefault()?.Type is {} firstParameterType
                 && NativeNullableType.Unwrap(firstParameterType) is NativeHandle thisHandle)
             {
                 thisHandle.Methods.Add(f);

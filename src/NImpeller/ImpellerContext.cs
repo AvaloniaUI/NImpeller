@@ -32,12 +32,12 @@ public unsafe partial class ImpellerContext
         var settings = new ImpellerContextVulkanSettings
         {
             User_data = GCHandle.ToIntPtr(handle),
-            Enable_vulkan_validation = enableValidation ? 1 : 0,
+            Enable_vulkan_validation = enableValidation,
             Proc_address_callback = (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr, IntPtr, IntPtr, IntPtr>)&GetVulkanProcAddressCallback,
         };
         var res = UnsafeNativeMethods.ImpellerContextCreateVulkanNew(UnsafeNativeMethods.ImpellerVersion, &settings);
         handle.Free();
-        return res != null! ? new ImpellerContext(res) : null;
+        return FromNew(res);
     }
 
     public static ImpellerContext? CreateOpenGLESNew(Func<string, IntPtr> getProcAddress)
@@ -50,13 +50,13 @@ public unsafe partial class ImpellerContext
             (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr, IntPtr, IntPtr>)&GetProcAddressCallback,
             GCHandle.ToIntPtr(handle));
         handle.Free();
-        return res != null! ? new ImpellerContext(res) : null;
+        return FromNew(res);
     }
 
     public static ImpellerContext? CreateMetalNew()
     {
         var res = UnsafeNativeMethods.ImpellerContextCreateMetalNew(UnsafeNativeMethods.ImpellerVersion);
-        return res != null! ? new ImpellerContext(res) : null;
+        return FromNew(res);
     }
 
     public ImpellerContextVulkanInfo? GetVulkanInfo()
@@ -65,5 +65,13 @@ public unsafe partial class ImpellerContext
         if (UnsafeNativeMethods.ImpellerContextGetVulkanInfo(Handle, &info) == 0)
             return null;
         return info;
+    }
+
+    private static ImpellerContext? FromNew(ImpellerContextHandle handle)
+    {
+        if (!handle.IsInvalid)
+            return new ImpellerContext(handle);
+        handle.Dispose();
+        return null;
     }
 }

@@ -110,6 +110,11 @@ public partial class ImpellerColorSource
         }
     }
 
-    private static ImpellerColorSource? Wrap(ImpellerColorSourceHandle ret) =>
-        ret == null ? null : new ImpellerColorSource(ret);
+    private static ImpellerColorSource? Wrap(ImpellerColorSourceHandle ret)
+    {
+        if (!ret.IsInvalid)
+            return new ImpellerColorSource(ret);
+        ret.Dispose();
+        return null;
+    }
 }

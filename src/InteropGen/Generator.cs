@@ -13,7 +13,7 @@ class Generator
         {
             Level: 1, IsConst: false, IsString: false, IsGenericDataPointer: false, IsVoidPtr: false
         } pt
-        && NativeNullableType.Unwrap(pt.ElementType) is NativeStruct;
+        && NativeNullableType.Unwrap(pt.ElementType) is NativeStruct or NativeEnum;
 
     public static void Generate(NativeModel model, CodeGen gen)
     {
@@ -30,7 +30,20 @@ class Generator
             "ImpellerColorSourceCreateRadialGradientNew",
             "ImpellerColorSourceCreateConicalGradientNew",
             "ImpellerColorSourceCreateSweepGradientNew",
-            "ImpellerTypographyContextRegisterFont"
+            "ImpellerTypographyContextRegisterFont",
+            "ImpellerPathCreateDashedNew",
+            // Buffers, arrays, strings and callbacks.
+            "ImpellerTypefaceCreateWithDataNew",
+            "ImpellerTypefaceCreateWithVariationsNew",
+            "ImpellerTypefaceCopyTableData",
+            "ImpellerTypefaceCopyData",
+            "ImpellerTypefaceCopyFamilyName",
+            "ImpellerTypographyContextCopyFamilyName",
+            "ImpellerFontGetGlyphBounds",
+            "ImpellerDisplayListBuilderDrawGlyphs",
+            "ImpellerImageDecoderNew",
+            "ImpellerImageDecoderDecode",
+            "ImpellerImageEncode",
         };
         var fastFunctions = new HashSet<string>()
         {
@@ -103,6 +116,8 @@ class Generator
 
             string MapInteropType(NativeType type, bool allowHandles, bool allowStrings)
             {
+                if (type is NativeNullableType { Nullable: true } && type.IsString && allowStrings)
+                    return "string?";
                 if (TryMapCommonType(type, allowStrings, out var common))
                     return common;
                 if (type is NativeHandle handle)
@@ -148,6 +163,17 @@ class Generator
                         else
                         {
                             var t = MapInteropType(m.Type, false, false);
+                            if (m.Type is NativePrimitiveType { IsBool: true })
+                            {
+                                using (gen.Line($"private {t} _{m.Name};")
+                                           .Line($"public bool {Pascal(m.Name)}")
+                                           .Scope())
+                                {
+                                    gen.Line("readonly get => _" + m.Name + " != 0;");
+                                    gen.Line("set => _" + m.Name + " = value ? (byte)1 : (byte)0;");
+                                }
+                                continue;
+                            }
                             using (gen.Line($"private {t} _{m.Name};")
                                        .Line($"public {t} {Pascal(m.Name)}")
                                        .Scope())
@@ -172,8 +198,9 @@ class Generator
                             "[System.Runtime.InteropServices.LibraryImport(\"impeller\", StringMarshalling = System.Runtime.InteropServices.StringMarshalling.Utf8)]");
 
                     // TODO: Experimental
-                    if (imp.Name.StartsWith("ImpellerPathBuilder") || imp.Name.EndsWith("Retain") ||
-                        imp.Name.EndsWith("Release"))
+                    // Not Release: freeing an object can run a mapping's managed release callback,
+                    // which isn't allowed without a GC transition.
+                    if (imp.Name.StartsWith("ImpellerPathBuilder") || imp.Name.EndsWith("Retain"))
                         gen.Line("[System.Runtime.InteropServices.SuppressGCTransition]");
                     
                     if ((imp.Name.EndsWith("Release") || imp.Name.EndsWith("Retain")) && imp.Parameters.Count == 1 &&
@@ -199,6 +226,10 @@ class Generator
 
             string MapDotnetType(NativeType type, bool allowHandles)
             {
+                if (type is NativePrimitiveType { IsBool: true })
+                    return "bool";
+                if (type is NativeNullableType { Nullable: true } && type.IsString)
+                    return "string?";
                 if (type is NativePointerType { ElementType: NativeStruct ns, Level: 1 } &&
                     manualMarshal.TryGetValue(ns.Name, out var marshalled))
                     return marshalled;
@@ -222,6 +253,9 @@ class Generator
                         throw new UseManualInteropException();
                     if(pt.IsString)
                         return "string";
+                    // Pointers to primitives are arrays or buffers.
+                    if (NativeNullableType.Unwrap(pt.ElementType) is NativePrimitiveType)
+                        throw new UseManualInteropException();
                     return MapDotnetType(pt.ElementType, false);
                 }
 
@@ -309,6 +343,8 @@ class Generator
                                     }
                                     else if (a.Type is NativePointerType { IsString: false, Level: 1, IsGenericDataPointer: false, IsVoidPtr: false })
                                         invocation += $"&{a.Name}";
+                                    else if (a.Type is NativePrimitiveType { IsBool: true })
+                                        invocation += $"({a.Name} ? (byte)1 : (byte)0)";
                                     else
                                         invocation += a.Name;
 
@@ -345,11 +381,20 @@ class Generator
                                         // functions return a SafeHandle from P/Invoke (compare to null);
                                         // other handle-returning functions return a raw IntPtr (compare to IntPtr.Zero).
                                         if (f.Name.EndsWith("New"))
-                                            gen.Line("if(ret == null) return null;");
+                                        {
+                                            // A NULL return still marshals to a SafeHandle.
+                                            using (gen.Line("if (ret.IsInvalid)").Scope())
+                                            {
+                                                gen.Line("ret.Dispose();");
+                                                gen.Line("return null;");
+                                            }
+                                        }
                                         else
                                             gen.Line("if(ret == global::System.IntPtr.Zero) return null;");
                                         GenerateHandleReturn(nativeHandleType);
                                     }
+                                    else if (f.ReturnType is NativePrimitiveType { IsBool: true })
+                                        gen.Line("return ret != 0;");
                                     else
                                         gen.Line("return ret;");
                                 }

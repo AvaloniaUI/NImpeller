@@ -335,7 +335,7 @@ public sealed class ShadowsScene : IScene
         {
             pb.AddOval(new ImpellerRect(40, 40, 110, 110));
             using var path = pb.TakePathNew(ImpellerFillType.kImpellerFillTypeNonZero)!;
-            b.DrawShadow(path, shadowColor, 8f, 0, 1f);
+            b.DrawShadow(path, shadowColor, 8f, false, 1f);
             using var paint = ImpellerPaint.New()!;
             paint.SetColor(ImpellerColor.FromRgb(220, 90, 90));
             b.DrawPath(path, paint);
@@ -345,7 +345,7 @@ public sealed class ShadowsScene : IScene
         {
             pb.AddRoundedRect(new ImpellerRect(190, 50, 120, 90), Draw.UniformRadii(20));
             using var path = pb.TakePathNew(ImpellerFillType.kImpellerFillTypeNonZero)!;
-            b.DrawShadow(path, shadowColor, 14f, 0, 1f);
+            b.DrawShadow(path, shadowColor, 14f, false, 1f);
             using var paint = ImpellerPaint.New()!;
             paint.SetColor(ImpellerColor.FromRgb(90, 140, 230));
             b.DrawPath(path, paint);

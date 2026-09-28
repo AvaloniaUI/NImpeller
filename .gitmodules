@@ -1,3 +1,6 @@
 [submodule "external/CppAst.NET"]
 	path = external/CppAst.NET
 	url = https://github.com/kekekeks/CppAst.NET.git
+[submodule "external/flutter"]
+	path = external/flutter
+	url = https://github.com/drasticactions/flutter.git

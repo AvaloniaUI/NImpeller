@@ -149,6 +149,30 @@ public unsafe partial class ImpellerFont
         fixed (ImpellerRect* b = bounds)
             UnsafeNativeMethods.ImpellerFontGetGlyphBounds(Handle, g, (uint)glyphs.Length, b);
     }
+
+    /// <summary>
+    /// Prepares glyphs shaped by the caller for drawing many times with
+    /// <see cref="ImpellerDisplayListBuilder.DrawGlyphRun"/>. <paramref name="positions"/> are relative to the
+    /// origin given when drawing. Returns null for no glyphs.
+    /// </summary>
+    public ImpellerGlyphRun? GlyphRunNew(ReadOnlySpan<ushort> glyphs, ReadOnlySpan<ImpellerPoint> positions)
+    {
+        if (positions.Length < glyphs.Length)
+            throw new ArgumentException("There must be a position for each glyph.", nameof(positions));
+        if (glyphs.IsEmpty)
+            return null;
+        fixed (ushort* g = glyphs)
+        fixed (ImpellerPoint* p = positions)
+        {
+            var handle = UnsafeNativeMethods.ImpellerGlyphRunNew(Handle, g, p, (uint)glyphs.Length);
+            if (handle.IsInvalid)
+            {
+                handle.Dispose();
+                return null;
+            }
+            return new ImpellerGlyphRun(handle);
+        }
+    }
 }
 
 public unsafe partial class ImpellerDisplayListBuilder

@@ -8,11 +8,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Silk.NET.GLFW" Version="2.22.0"/>
-    <PackageReference Include="Silk.NET.Vulkan" Version="2.22.0"/>
-    <PackageReference Include="Silk.NET.OpenGL" Version="2.22.0"/>
-    <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" Version="2.22.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+    <PackageReference Include="Silk.NET.GLFW"/>
+    <PackageReference Include="Silk.NET.Vulkan"/>
+    <PackageReference Include="Silk.NET.OpenGL"/>
+    <PackageReference Include="Silk.NET.Vulkan.Extensions.KHR" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
 
   <ItemGroup>

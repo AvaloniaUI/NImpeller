@@ -19,17 +19,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           submodules: recursive
 
       - name: Set up .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
 
       # Software OpenGL ES (Mesa/llvmpipe) + SDL2 + a virtual display. The tests render offscreen
-      # on llvmpipe (forced by tests/NImpeller.Tests/test.runsettings) but SDL still needs a video
+      # on llvmpipe (forced by tests/NImpeller.Tests/Headless/SoftwareGLEnvironment.cs) but SDL still needs a video
       # driver, so we provide one with Xvfb.
       - name: Install GL + SDL runtime dependencies
         run: |
@@ -73,8 +73,8 @@ jobs:
       # On a golden mismatch the tests write actual/golden PNGs here for inspection.
       - name: Upload golden diffs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: golden-failures
-          path: tests/NImpeller.Tests/bin/Release/net8.0/TestFailures/
+          path: tests/NImpeller.Tests/bin/Release/net10.0/TestFailures/
           if-no-files-found: ignore

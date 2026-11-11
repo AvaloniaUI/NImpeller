@@ -90,30 +90,15 @@ class Build : NukeBuild
 
     Target GenerateBindings => _ => _
         .Description("Generate Impeller bindings from impeller.h using InteropGen")
-        .Requires(() => Platform != null || All)
+        .Requires(() => Platform)
         .Executes(() =>
         {
-            if (!string.IsNullOrEmpty(Platform) && All)
+            if (!SupportedPlatforms.Contains(Platform))
             {
-                throw new Exception("Cannot specify both --platform and --all");
+                throw new Exception($"Platform {Platform} is unsupported");
             }
 
-            if (All)
-            {
-                foreach (var item in SupportedPlatforms)
-                {
-                    GenerateBindingsWithPlatform(Platform);
-                }
-            }
-            else
-            {
-                if (!SupportedPlatforms.Contains(Platform))
-                {
-                    throw new Exception($"Platform {Platform} is unsupported");
-                }
-
-                GenerateBindingsWithPlatform(Platform);
-            }
+            GenerateBindingsWithPlatform(Platform);
         });
 
     Target ListImpellerCommits => _ => _

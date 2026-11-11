@@ -90,7 +90,7 @@ mkdir -p ide
 
 ### Tests
 
-Tests are included in `tests/NImpeller.Tests`. They run on Microsoft.Testing.Platform (set in `global.json`). Run them with
+Tests are included in `tests/NImpeller.Tests`. Run them with
 
 ```sh
 dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj

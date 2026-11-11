@@ -6,7 +6,7 @@ Generated bindings file is NOT checked out into the repo, because right now the 
 
 ### Running this thing
 
-You need the .NET 10 SDK. The exact version is pinned in `global.json`.
+You need the .NET 10 SDK.
 
 1) Generate the Impeller bindings. If you have never generated the bindings, they will be generated on first build of NImpeller via an MSBuild task. You should see this as `DownloadSdkAndGenerateBindings`. This task downloads only the `linux-x64` SDK (for the headers) and the SDK for your own platform (for the native library). You can also use the InteropGen program directly with the `impeller.h` header, or use the Nuke task
 

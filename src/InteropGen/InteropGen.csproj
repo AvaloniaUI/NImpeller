@@ -5,16 +5,18 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
-        <RuntimeIdentifiers>linux-x64;osx-x64;win-x64</RuntimeIdentifiers>
+        <RuntimeIdentifiers>linux-x64;linux-arm64;osx-x64;osx-arm64;win-x64</RuntimeIdentifiers>
     </PropertyGroup>
 
     <ItemGroup>
       <PackageReference Include="ClangSharp" />
       <PackageReference Include="libclang.runtime.linux-x64" />
+      <PackageReference Include="libclang.runtime.linux-arm64" />
       <PackageReference Include="libclang.runtime.win-x64" />
       <PackageReference Include="libclang.runtime.osx-x64" />
       <PackageReference Include="libclang.runtime.osx-arm64" />
       <PackageReference Include="libclangsharp.runtime.linux-x64" />
+      <PackageReference Include="libclangsharp.runtime.linux-arm64" />
       <PackageReference Include="libclangsharp.runtime.win-x64" />
       <PackageReference Include="libclangsharp.runtime.osx-x64" />
       <PackageReference Include="libclangsharp.runtime.osx-arm64" />

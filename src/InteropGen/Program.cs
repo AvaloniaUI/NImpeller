@@ -30,7 +30,7 @@ class Program
 
         var dir = typeof(Program).Assembly.Location;
         Directory.SetCurrentDirectory(Path.Combine(dir, ".."));
-        while (!File.Exists("NImpeller.sln"))
+        while (!File.Exists("NImpeller.slnx"))
         {
             Directory.SetCurrentDirectory("..");
             var curDir = Directory.GetCurrentDirectory();

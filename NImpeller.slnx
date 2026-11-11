@@ -1,0 +1,25 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/external/">
+    <Project Path="external/CppAst.NET/src/CppAst/CppAst.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/Sandbox.Core/Sandbox.Core.csproj" />
+    <Project Path="samples/Sandbox.GLFW/Sandbox.GLFW.csproj" />
+    <Project Path="samples/Sandbox.Metal/Sandbox.Metal.csproj" />
+    <Project Path="samples/Sandbox.SDL/Sandbox.SDL.csproj" />
+    <Project Path="samples/Sandbox/Sandbox.csproj" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/InteropGen/InteropGen.csproj" />
+    <Project Path="src/NImpeller/NImpeller.csproj" />
+  </Folder>
+  <Project Path="build/_build.csproj">
+    <Build Solution="*|Any CPU" Project="false" />
+  </Project>
+  <Project Path="tests/NImpeller.Tests/NImpeller.Tests.csproj" />
+</Solution>

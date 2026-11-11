@@ -2,16 +2,15 @@
     <Import Project="Impeller.targets" />
     <PropertyGroup>
         <OutputType>Exe</OutputType>
-        <TargetFramework>net8.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     </PropertyGroup>
 
     <ItemGroup>
-      <PackageReference Include="CommandLineParser" Version="2.9.1" />
-      <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
-      <PackageReference Include="Spectre.Console" Version="0.54.0" />
+      <PackageReference Include="CommandLineParser" />
+      <PackageReference Include="Microsoft.Extensions.Logging.Debug" />
+      <PackageReference Include="Spectre.Console" />
     </ItemGroup>
 
     <ItemGroup>

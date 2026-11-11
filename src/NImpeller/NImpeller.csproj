@@ -1,7 +1,6 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
         <Nullable>enable</Nullable>
         <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
         <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
@@ -27,13 +26,9 @@
     </Target>
 
     <Target Name="DownloadSdkAndGenerateBindings">
-        <Message Text="Generated bindings not found. Downloading linux-x64 Impeller SDK and generating bindings..." Importance="high" />
+        <Message Text="Generated bindings not found. Downloading the Impeller SDK for this machine and generating bindings..." Importance="high" />
 
-        <Exec Command="$(NukeBuildScript) DownloadLatestImpeller --root $(RootDirectory) --All"
-              WorkingDirectory="$(RootDirectory)"
-              IgnoreExitCode="false" />
-
-        <Exec Command="$(NukeBuildScript) GenerateBindings --root $(RootDirectory) --platform linux-x64"
+        <Exec Command="$(NukeBuildScript) GenerateBindings --root $(RootDirectory)"
               WorkingDirectory="$(RootDirectory)"
               IgnoreExitCode="false" />
 

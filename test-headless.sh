@@ -3,7 +3,7 @@
 # Usage:
 #   ./test-headless.sh                 # one run
 #   ./test-headless.sh -n 5            # run the suite 5 times (catch nondeterministic failures)
-#   ./test-headless.sh --filter Golden # pass extra args straight through to `dotnet test`
+#   ./test-headless.sh --filter-class "*GoldenImageTests" # pass extra args straight through to `dotnet test`
 #   RUNS=5 ./test-headless.sh          # same as -n 5
 #
 # UPDATE_GOLDENS=1 ./test-headless.sh  # regenerate baselines (honored by the tests)

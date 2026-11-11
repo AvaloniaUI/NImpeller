@@ -77,6 +77,12 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
 
     private void InitializeGL()
     {
+        if (OperatingSystem.IsMacOS())
+        {
+            throw new PlatformNotSupportedException(
+                "Headless GL tests need Linux with Mesa llvmpipe; macOS can't host SDL video off the main thread.");
+        }
+
         _sdl = Sdl.GetApi();
         if (_sdl.Init(Sdl.InitVideo) < 0)
         {

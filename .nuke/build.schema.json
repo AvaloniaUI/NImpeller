@@ -124,6 +124,10 @@
           "type": "string",
           "description": "Flutter commit SHA for Impeller SDK download"
         },
+        "IncludeHost": {
+          "type": "boolean",
+          "description": "Also download the SDK for the current host platform (native library for local runs)"
+        },
         "KeepZip": {
           "type": "boolean",
           "description": "Keep zip files after extraction"

@@ -51,7 +51,6 @@ jobs:
       - name: Download Impeller SDK (linux-x64) and generate bindings
         run: |
           chmod +x ./build.sh
-          ./build.sh DownloadLatestImpeller --platform linux-x64
           ./build.sh GenerateBindings --platform linux-x64
 
       # Prints what GL/EGL stack the runner actually exposes (helps diagnose context failures).

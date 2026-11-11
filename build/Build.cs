@@ -91,11 +91,17 @@ class Build : NukeBuild
     Target GenerateBindings => _ => _
         .Description("Generate Impeller bindings from impeller.h using InteropGen")
         .Requires(() => Platform)
-        .Executes(() =>
+        .Executes(async () =>
         {
             if (!SupportedPlatforms.Contains(Platform))
             {
                 throw new Exception($"Platform {Platform} is unsupported");
+            }
+
+            if (!File.Exists(OutputDirectory / Platform / "include" / "impeller.h"))
+            {
+                Log.Information("Impeller SDK for {Platform} not found, downloading it", Platform);
+                await DownloadPlatformAsync(ImpellerSha ?? GetLatestSha(), Platform);
             }
 
             GenerateBindingsWithPlatform(Platform);
@@ -150,17 +156,7 @@ class Build : NukeBuild
         .Executes(async () =>
         {
 
-            Log.Information("Fetching latest engine commit SHA...");
-            var sha = GitTasks.Git("ls-remote " + EngineRepo + " HEAD", logOutput: false)
-                .FirstOrDefault().Text.Split('\t')[0];
-
-            if (string.IsNullOrEmpty(sha))
-            {
-                throw new Exception("Failed to fetch latest commit SHA");
-            }
-
-            Log.Information("Latest SHA: {Sha}", sha);
-            Log.Information("");
+            var sha = GetLatestSha();
 
             await DownloadRequestedPlatformsAsync(sha);
         });
@@ -257,18 +253,29 @@ class Build : NukeBuild
         }
     }
 
+    string GetLatestSha()
+    {
+        Log.Information("Fetching latest engine commit SHA...");
+        var sha = GitTasks.Git("ls-remote " + EngineRepo + " HEAD", logOutput: false)
+            .FirstOrDefault().Text.Split('\t')[0];
+
+        if (string.IsNullOrEmpty(sha))
+        {
+            throw new Exception("Failed to fetch latest commit SHA");
+        }
+
+        Log.Information("Latest SHA: {Sha}", sha);
+        Log.Information("");
+        return sha;
+    }
+
     void GenerateBindingsWithPlatform(string platform)
     {
         var impellerHeaderPath = OutputDirectory / platform / "include" / "impeller.h";
 
         if (!File.Exists(impellerHeaderPath))
         {
-            throw new Exception(
-                $"Impeller header file not found at: {impellerHeaderPath}\n" +
-                $"Please download the {platform} Impeller SDK first by running the Nuke build task:\n" +
-                $"  DownloadLatestImpeller --platform {platform}\n" +
-                "or\n" +
-                $"  DownloadImpeller --impeller-sha <commit-sha> --platform {platform}");
+            throw new Exception($"Impeller header file not found at: {impellerHeaderPath}");
         }
 
         Log.Information("Found impeller.h at: {Path}", impellerHeaderPath);

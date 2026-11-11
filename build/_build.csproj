@@ -13,7 +13,6 @@
 
   <ItemGroup>
     <PackageReference Include="Nuke.Common" />
-    <!-- Transitive pins; versions and rationale in Directory.Packages.props. -->
     <PackageReference Include="NuGet.Packaging" />
     <PackageReference Include="System.Security.Cryptography.Pkcs" />
     <PackageReference Include="System.Security.Cryptography.Xml" />

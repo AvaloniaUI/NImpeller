@@ -10,8 +10,7 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <RootNamespace>NImpeller.Tests</RootNamespace>
 
-    <!-- xUnit v3 test projects are executables; tests run on Microsoft.Testing.Platform
-         (see global.json). Software GL is forced by Headless/SoftwareGLEnvironment.cs. -->
+    <!-- xUnit v3 test projects are executables. -->
     <OutputType>Exe</OutputType>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>

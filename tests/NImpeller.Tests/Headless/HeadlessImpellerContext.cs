@@ -77,9 +77,6 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
 
     private void InitializeGL()
     {
-        // Cocoa requires SDL video init and window creation on the process main thread, which the
-        // test host owns; doing it on this worker thread aborts the process with an NSException.
-        // The goldens also need Mesa llvmpipe, which macOS doesn't have.
         if (OperatingSystem.IsMacOS())
         {
             throw new PlatformNotSupportedException(

@@ -180,10 +180,6 @@ class Build : NukeBuild
             await DownloadRequestedPlatformsAsync(sha);
         });
 
-    /// <summary>
-    /// The SDK platform matching this machine (e.g. darwin-arm64), or null if Impeller doesn't ship one.
-    /// Uses the OS architecture, matching the native-library selection in Impeller.targets.
-    /// </summary>
     static string HostPlatform
     {
         get

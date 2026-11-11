@@ -13,9 +13,9 @@ class Program
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
             setenv("LIBCLANG_DISABLE_CRASH_RECOVERY", "1", 1);
         
-        if (args.Length != 1)
+        if (args.Length is < 1 or > 2)
         {
-            Console.WriteLine("Usage: InteropGen <path to impeller.h>");
+            Console.WriteLine("Usage: InteropGen <path to impeller.h> [output .cs path]");
             return;
         }
 
@@ -27,6 +27,7 @@ class Program
         }
 
         var model = NativeModel.Load(impellerHeaderPath, []);
+        var outputPath = args.Length == 2 ? Path.GetFullPath(args[1]) : null;
 
         var dir = typeof(Program).Assembly.Location;
         Directory.SetCurrentDirectory(Path.Combine(dir, ".."));
@@ -41,7 +42,8 @@ class Program
 
         var cg = new CodeGen();
         Generator.Generate(model, cg);
-        Directory.CreateDirectory("src/NImpeller/Generated");
-        File.WriteAllText("src/NImpeller/Generated/Bindings.g.cs", cg.ToString());
+        outputPath ??= Path.GetFullPath("src/NImpeller/Generated/Bindings.g.cs");
+        Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+        File.WriteAllText(outputPath, cg.ToString());
     }
 }

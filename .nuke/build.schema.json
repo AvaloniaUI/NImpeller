@@ -30,6 +30,8 @@
         "DownloadLatestImpeller",
         "GenerateBindings",
         "ListImpellerCommits",
+        "Pack",
+        "ResolveFlutterVersion",
         "Restore"
       ]
     },
@@ -120,6 +122,18 @@
           "type": "boolean",
           "description": "Extract downloaded files"
         },
+        "FlutterRef": {
+          "type": "string",
+          "description": "Flutter tag or commit to package (default: latest stable tag)"
+        },
+        "FlutterRemote": {
+          "type": "string",
+          "description": "Git remote of the Flutter checkout to fetch tags from (default: upstream)"
+        },
+        "FlutterRoot": {
+          "type": "string",
+          "description": "Path to a flutter/flutter checkout (default: ../flutter)"
+        },
         "ImpellerSha": {
           "type": "string",
           "description": "Flutter commit SHA for Impeller SDK download"
@@ -132,9 +146,18 @@
           "type": "boolean",
           "description": "Keep zip files after extraction"
         },
+        "NoFetch": {
+          "type": "boolean",
+          "description": "Do not fetch tags from the Flutter remote"
+        },
         "Platform": {
           "type": "string",
           "description": "Platform to download (linux-x64, darwin-arm64, etc.)"
+        },
+        "Revision": {
+          "type": "integer",
+          "description": "Binding revision on top of the same Flutter release (stable: 4th version part, beta: last prerelease part)",
+          "format": "int32"
         }
       }
     },

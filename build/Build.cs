@@ -21,7 +21,7 @@ using static Nuke.Common.IO.PathConstruction;
 using static Nuke.Common.Tools.DotMemoryUnit.DotMemoryUnitTasks;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
-class Build : NukeBuild
+partial class Build : NukeBuild
 {
     /// Support plugins are available for:
     ///   - JetBrains ReSharper        https://nuke.build/resharper
@@ -281,6 +281,11 @@ class Build : NukeBuild
         }
 
         Log.Information("Found impeller.h at: {Path}", impellerHeaderPath);
+        RunInteropGen(impellerHeaderPath, RootDirectory / "src" / "NImpeller" / "Generated" / "Bindings.g.cs");
+    }
+
+    void RunInteropGen(AbsolutePath header, AbsolutePath output)
+    {
         Log.Information("Building InteropGen...");
 
         var interopGenProject = RootDirectory / "src" / "InteropGen" / "InteropGen.csproj";
@@ -294,14 +299,12 @@ class Build : NukeBuild
             .SetProjectFile(interopGenProject)
             .SetConfiguration(Configuration)
             .SetNoBuild(true)
-            .SetApplicationArguments(impellerHeaderPath));
+            .SetApplicationArguments(header, output));
 
-        var generatedFile = RootDirectory / "src" / "NImpeller" / "Generated" / "Bindings.g.cs";
-        if (File.Exists(generatedFile))
+        if (File.Exists(output))
         {
-            var fileInfo = new FileInfo(generatedFile);
-            var fileSize = fileInfo.Length / 1024.0;
-            Log.Information("Successfully generated bindings at: {Path} ({Size:F2} KB)", generatedFile, fileSize);
+            var fileSize = new FileInfo(output).Length / 1024.0;
+            Log.Information("Successfully generated bindings at: {Path} ({Size:F2} KB)", output, fileSize);
         }
         else
         {
@@ -309,10 +312,13 @@ class Build : NukeBuild
         }
     }
 
-    async Task DownloadPlatformAsync(string sha, string platform)
+    Task DownloadPlatformAsync(string sha, string platform) =>
+        DownloadPlatformAsync(sha, platform, OutputDirectory);
+
+    async Task DownloadPlatformAsync(string sha, string platform, AbsolutePath sdkRoot)
     {
         var url = $"{BaseUrl}/{sha}/{platform}/impeller_sdk.zip";
-        var platformDir = OutputDirectory / platform;
+        var platformDir = sdkRoot / platform;
         var zipFile = platformDir / "impeller_sdk.zip";
 
         platformDir.CreateOrCleanDirectory();

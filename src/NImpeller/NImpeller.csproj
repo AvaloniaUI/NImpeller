@@ -15,7 +15,12 @@
         <NukeBuildScript Condition="!$([MSBuild]::IsOSPlatform('Windows'))">$(RootDirectory)/build.sh</NukeBuildScript>
     </PropertyGroup>
 
-    <Target Name="EnsureBindingsGenerated" BeforeTargets="BeforeBuild">
+    <ItemGroup Condition="'$(NImpellerBindingsFile)' != ''">
+        <Compile Remove="Generated/**" />
+        <Compile Include="$(NImpellerBindingsFile)" Link="Generated/Bindings.g.cs" />
+    </ItemGroup>
+
+    <Target Name="EnsureBindingsGenerated" BeforeTargets="BeforeBuild" Condition="'$(NImpellerBindingsFile)' == ''">
         <PropertyGroup>
             <BindingsExist Condition="!Exists('$(GeneratedBindingsFile)')">false</BindingsExist>
         </PropertyGroup>

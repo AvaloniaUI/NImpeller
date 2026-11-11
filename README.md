@@ -53,6 +53,33 @@ Or use
 
 For a specific commit.
 
+### NuGet packages
+
+`Pack` builds NuGet packages from a Flutter release tag or commit, using a local
+[flutter/flutter](https://github.com/flutter/flutter) checkout (default `../flutter`) to find the
+engine build. Only `git fetch <remote> --tags` is run on it.
+
+```sh
+./build.sh Pack --flutter-ref 3.47.9                  # stable  -> 3.47.9
+./build.sh Pack --flutter-ref 3.47.9 --revision 1     # binding fix for the same release -> 3.47.9.1
+./build.sh Pack --flutter-ref 3.50.0-0.4.pre          # beta    -> 3.50.0-pre.0.4.0
+./build.sh Pack --flutter-ref a55d35a8b73             # commit  -> 3.51.0-dev.20261110.a55d35a
+./build.sh ResolveFlutterVersion --flutter-ref 3.47.9 # show the commit, engine hash and version only
+```
+
+Options: `--flutter-root <path>`, `--flutter-remote <name>` (default `upstream`), `--no-fetch`.
+
+Tags use `bin/internal/engine.version`, other commits use Flutter's content-aware hash. The SDK for
+every desktop RID is downloaded and bindings are generated into `artifacts/staging/<version>/`
+(`external/impeller_sdk` and `Generated/Bindings.g.cs` are not touched). The target then checks
+that `impeller.h` is the same on all platforms and that the host native library matches the
+generated `IMPELLER_VERSION`, and runs the unit tests. Packages go to `artifacts/packages/`:
+
+- `NImpeller`: managed bindings, depends on `NImpeller.Native` (exact version)
+- `NImpeller.Native`: meta package that depends on every RID package
+- `NImpeller.Native.<rid>`: `runtimes/<rid>/native/` for `linux-x64`, `linux-arm64`, `osx-x64`,
+  `osx-arm64`, `win-x64`, `win-arm64`
+
 ### Handles
 
 Native impeller handles are represented by two separate types:

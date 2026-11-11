@@ -90,21 +90,23 @@ class Build : NukeBuild
 
     Target GenerateBindings => _ => _
         .Description("Generate Impeller bindings from impeller.h using InteropGen")
-        .Requires(() => Platform)
         .Executes(async () =>
         {
-            if (!SupportedPlatforms.Contains(Platform))
+            var platform = Platform ?? HostPlatform
+                ?? throw new Exception($"No Impeller SDK available for this host ({RuntimeInformation.OSDescription}, {RuntimeInformation.OSArchitecture}); pass --platform");
+
+            if (!SupportedPlatforms.Contains(platform))
             {
-                throw new Exception($"Platform {Platform} is unsupported");
+                throw new Exception($"Platform {platform} is unsupported");
             }
 
-            if (!File.Exists(OutputDirectory / Platform / "include" / "impeller.h"))
+            if (!File.Exists(OutputDirectory / platform / "include" / "impeller.h"))
             {
-                Log.Information("Impeller SDK for {Platform} not found, downloading it", Platform);
-                await DownloadPlatformAsync(ImpellerSha ?? GetLatestSha(), Platform);
+                Log.Information("Impeller SDK for {Platform} not found, downloading it", platform);
+                await DownloadPlatformAsync(ImpellerSha ?? GetLatestSha(), platform);
             }
 
-            GenerateBindingsWithPlatform(Platform);
+            GenerateBindingsWithPlatform(platform);
         });
 
     Target ListImpellerCommits => _ => _

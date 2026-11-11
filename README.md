@@ -8,13 +8,13 @@ Generated bindings file is NOT checked out into the repo, because right now the 
 
 You need the .NET 10 SDK.
 
-1) Generate the Impeller bindings. If you have never generated the bindings, they will be generated on first build of NImpeller via an MSBuild task. You should see this as `DownloadSdkAndGenerateBindings`. This task downloads only the `linux-x64` SDK (for the headers) and the SDK for your own platform (for the native library). You can also use the InteropGen program directly with the `impeller.h` header, or use the Nuke task
+1) Generate the Impeller bindings. If you have never generated the bindings, they will be generated on first build of NImpeller via an MSBuild task. You should see this as `DownloadSdkAndGenerateBindings`. This task downloads the SDK for your own platform and generates the bindings from its headers. You can also use the InteropGen program directly with the `impeller.h` header, or use the Nuke task
 
 ```sh
-./build.sh GenerateBindings --platform linux-x64
+./build.sh GenerateBindings
 ```
 
-to build the bindings. It downloads the `linux-x64` SDK if it is missing.
+to build the bindings. It uses the SDK for your own platform and downloads it if it is missing. To use the SDK of a different platform, add `--platform <platform>`.
 
 2) Run the Sandbox sample. The runtime file used is based on the `Impeller.targets` file. You can either manually set up the library you want to test with, or use the Nuke tasks below for automatically setting it up per commit, or with the latest commit. 
 

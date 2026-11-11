@@ -12,7 +12,11 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Nuke.Common" Version="9.0.4" />
+    <PackageReference Include="Nuke.Common" Version="10.1.0" />
+    <!-- Transitive pins: Nuke.Common 10.1.0 still pulls vulnerable versions of these. -->
+    <PackageReference Include="NuGet.Packaging" Version="6.12.5" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.15" />
+    <PackageReference Include="System.Security.Cryptography.Xml" Version="10.0.15" />
   </ItemGroup>
 
 </Project>

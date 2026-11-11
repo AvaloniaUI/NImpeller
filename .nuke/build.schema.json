@@ -146,6 +146,10 @@
           "type": "boolean",
           "description": "Keep zip files after extraction"
         },
+        "LlvmStrip": {
+          "type": "string",
+          "description": "Path to llvm-strip, used to strip the Android libraries (default: from the Android NDK, then PATH)"
+        },
         "NoFetch": {
           "type": "boolean",
           "description": "Do not fetch tags from the Flutter remote"

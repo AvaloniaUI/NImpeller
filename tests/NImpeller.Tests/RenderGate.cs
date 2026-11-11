@@ -27,6 +27,6 @@ internal static class RenderGate
 
         Assert.True(gl.IsSoftwareRenderer,
             $"Expected a software renderer (llvmpipe) but got '{gl.RendererName}'. " +
-            "Ensure test.runsettings is applied (it is by default via dotnet test). See README.");
+            "SoftwareGLEnvironment forces llvmpipe on Linux; is Mesa installed? See README.");
     }
 }

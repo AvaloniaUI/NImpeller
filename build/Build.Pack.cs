@@ -14,6 +14,7 @@ using NuGet.Packaging.Licenses;
 using NuGet.Versioning;
 using Nuke.Common;
 using Nuke.Common.IO;
+using Nuke.Common.Tooling;
 using Nuke.Common.Tools.DotNet;
 using Serilog;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
@@ -44,20 +45,29 @@ partial class Build
     [Parameter("Do not fetch tags from the Flutter remote")]
     readonly bool NoFetch;
 
+    [Parameter("Path to llvm-strip, used to strip the Android libraries (default: from the Android NDK, then PATH)")]
+    readonly AbsolutePath LlvmStrip;
+
     const string RepositoryUrl = "https://github.com/AvaloniaUI/NImpeller";
     const string PackageAuthors = "AvaloniaUI OÜ";
     const string PackageCopyright = "Copyright (c) AvaloniaUI OÜ All Rights Reserved";
     const string ManagedPackageId = "NImpeller";
     const string NativeMetaPackageId = "NImpeller.Native";
 
-    static readonly (string Platform, string Rid, string Library)[] PackagePlatforms =
+    // Strip: the library ships with debug info and is stripped before packing. Flutter's Android
+    // libimpeller.so is ~225 MB unstripped. android-x86 is left out: .NET for Android barely
+    // supports it and Flutter does not publish it for every engine commit.
+    static readonly (string Platform, string Rid, string Library, bool Strip)[] PackagePlatforms =
     {
-        ("linux-x64", "linux-x64", "libimpeller.so"),
-        ("linux-arm64", "linux-arm64", "libimpeller.so"),
-        ("darwin-x64", "osx-x64", "libimpeller.dylib"),
-        ("darwin-arm64", "osx-arm64", "libimpeller.dylib"),
-        ("windows-x64", "win-x64", "impeller.dll"),
-        ("windows-arm64", "win-arm64", "impeller.dll"),
+        ("linux-x64", "linux-x64", "libimpeller.so", false),
+        ("linux-arm64", "linux-arm64", "libimpeller.so", false),
+        ("darwin-x64", "osx-x64", "libimpeller.dylib", false),
+        ("darwin-arm64", "osx-arm64", "libimpeller.dylib", false),
+        ("windows-x64", "win-x64", "impeller.dll", false),
+        ("windows-arm64", "win-arm64", "impeller.dll", false),
+        ("android-arm64", "android-arm64", "libimpeller.so", true),
+        ("android-arm", "android-arm", "libimpeller.so", true),
+        ("android-x64", "android-x64", "libimpeller.so", true),
     };
 
     static readonly Regex StableTag = new(@"^(\d+)\.(\d+)\.(\d+)$");
@@ -87,6 +97,9 @@ partial class Build
             LogRelease(release);
             WarnIfWorkingTreeDirty();
 
+            // Find the strip tool before downloading several hundred MB of SDKs.
+            var llvmStrip = PackagePlatforms.Any(p => p.Strip) ? FindLlvmStrip() : null;
+
             var staging = ArtifactsDirectory / "staging" / release.PackageVersion;
             staging.CreateOrCleanDirectory();
             var sdk = staging / "sdk";
@@ -97,6 +110,8 @@ partial class Build
                 var lib = sdk / p.Platform / "lib" / p.Library;
                 if (!File.Exists(lib))
                     throw new Exception($"Expected native library missing from the {p.Platform} SDK: {lib}");
+                if (p.Strip)
+                    StripNativeLibrary(llvmStrip, p.Platform, lib);
             }
 
             var header = VerifyHeadersIdentical(sdk);
@@ -299,6 +314,71 @@ partial class Build
     }
 
     // ---------------------------------------------------------------------------------------
+    // Native library stripping
+    // ---------------------------------------------------------------------------------------
+
+    string FindLlvmStrip()
+    {
+        if (LlvmStrip != null)
+        {
+            if (!File.Exists(LlvmStrip))
+                throw new Exception($"--llvm-strip {LlvmStrip} does not exist");
+            return LlvmStrip;
+        }
+
+        var exe = OperatingSystem.IsWindows() ? "llvm-strip.exe" : "llvm-strip";
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        // NDK roots: explicit NDK variables first, then the newest NDK of an Android SDK.
+        var ndkRoots = new[] { "ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK" }
+            .Select(Environment.GetEnvironmentVariable)
+            .Where(d => !string.IsNullOrEmpty(d))
+            .ToList();
+        var sdkRoots = new[]
+            {
+                Environment.GetEnvironmentVariable("ANDROID_HOME"),
+                Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT"),
+                Path.Combine(home, "Library", "Android", "sdk"),
+                Path.Combine(home, "Android", "Sdk"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Android", "Sdk"),
+            }
+            .Where(d => !string.IsNullOrEmpty(d) && Directory.Exists(Path.Combine(d, "ndk")));
+        foreach (var sdk in sdkRoots)
+            ndkRoots.AddRange(Directory.GetDirectories(Path.Combine(sdk, "ndk"))
+                .OrderByDescending(d => Version.TryParse(Path.GetFileName(d), out var v) ? v : new Version()));
+
+        foreach (var ndk in ndkRoots)
+        {
+            var prebuilt = Path.Combine(ndk, "toolchains", "llvm", "prebuilt");
+            if (!Directory.Exists(prebuilt))
+                continue;
+            var tool = Directory.GetDirectories(prebuilt)
+                .Select(d => Path.Combine(d, "bin", exe))
+                .FirstOrDefault(File.Exists);
+            if (tool != null)
+                return tool;
+        }
+
+        var onPath = (Environment.GetEnvironmentVariable("PATH") ?? "")
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+            .Select(d => Path.Combine(d, exe))
+            .FirstOrDefault(File.Exists);
+        return onPath ?? throw new Exception(
+            "llvm-strip not found. Install the Android NDK, set ANDROID_NDK_HOME, or pass --llvm-strip <path>");
+    }
+
+    static void StripNativeLibrary(string llvmStrip, string platform, AbsolutePath library)
+    {
+        var before = new FileInfo(library).Length;
+        // Same as the Android Gradle plugin: drop debug info and the static symbol table, keep .dynsym.
+        ProcessTasks.StartProcess(llvmStrip, $"--strip-unneeded \"{library}\"", logOutput: false)
+            .AssertZeroExitCode();
+        var after = new FileInfo(library).Length;
+        Log.Information("Stripped {Platform} {Library}: {Before:N1} MB -> {After:N1} MB",
+            platform, library.Name, before / 1048576.0, after / 1048576.0);
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Verification
     // ---------------------------------------------------------------------------------------
 
@@ -418,7 +498,7 @@ partial class Build
                 # {id}
 
                 The Impeller native library (`{p.Library}`) for `{p.Rid}`, from Flutter's prebuilt
-                `impeller_sdk.zip`. You normally reference `{ManagedPackageId}` (all RIDs) or
+                `impeller_sdk.zip`{(p.Strip ? " (stripped of debug info)" : "")}. You normally reference `{ManagedPackageId}` (all RIDs) or
                 `{ManagedPackageId}` plus only the `{NativeMetaPackageId}.<rid>` packages you ship.
 
                 {OriginTable(release)}

@@ -6,7 +6,9 @@ Generated bindings file is NOT checked out into the repo, because right now the 
 
 ### Running this thing
 
-1) Generate the Impeller bindings. If you have never generated the bindings, they will be generated on first build of NImpeller via an MSBuild task. You should see this as `DownloadSdkAndGenerateBindings`. You can also use the InteropGen program directly with the `impeller.h` header, or use the Nuke task
+You need the .NET 10 SDK. The exact version is pinned in `global.json`.
+
+1) Generate the Impeller bindings. If you have never generated the bindings, they will be generated on first build of NImpeller via an MSBuild task. You should see this as `DownloadSdkAndGenerateBindings`. This task downloads only the `linux-x64` SDK (for the headers) and the SDK for your own platform (for the native library). You can also use the InteropGen program directly with the `impeller.h` header, or use the Nuke task
 
 ```sh
 ./build.sh GenerateBindings
@@ -37,7 +39,13 @@ The files can be automatically downloaded via [Nuke](https://nuke.build/docs/get
 ./build.sh DownloadLatestImpeller --All
 ```
 
-to download the newest Impeller build by the newest commit to Flutter, or
+to download the newest Impeller build by the newest commit to Flutter. To download less, replace `--All` with `--platform <platform>`, `--include-host` (the platform of this machine), or both:
+
+```sh
+./build.sh DownloadLatestImpeller --platform linux-x64 --include-host
+```
+
+Or use
 
 ```sh
 ./build.sh DownloadImpeller --impeller-sha (Commit Sha) --All
@@ -82,7 +90,7 @@ mkdir -p ide
 
 ### Tests
 
-Tests are included in `tests/NImpeller.Tests` and can be run with
+Tests are included in `tests/NImpeller.Tests`. They run on Microsoft.Testing.Platform (set in `global.json`). Run them with
 
 ```sh
 dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj
@@ -90,4 +98,10 @@ dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj
 
 or run `./test-headless.sh`
 
-At the moment, they assume you're using `llvmpipe` for a software GL context.
+The rendering tests need Linux with Mesa `llvmpipe` (software GL). The test assembly sets the Mesa and SDL environment variables for this itself. On macOS, the rendering tests are skipped.
+
+To run one test class, use an xUnit filter, for example:
+
+```sh
+dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj --filter-class "*GoldenImageTests"
+```

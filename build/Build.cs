@@ -4,6 +4,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Linq;
 using System.Net.Http;
+using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using Nuke.Common;
 using Nuke.Common.CI;
@@ -41,6 +42,9 @@ class Build : NukeBuild
 
     [Parameter("Download all platforms")]
     readonly bool All;
+
+    [Parameter("Also download the SDK for the current host platform (native library for local runs)")]
+    readonly bool IncludeHost;
 
     [Parameter("Extract downloaded files")]
     readonly bool Extract = true;
@@ -148,37 +152,18 @@ class Build : NukeBuild
     Target DownloadImpeller => _ => _
         .Description("Download Impeller SDK for specified platform(s)")
         .Requires(() => ImpellerSha)
-        .Requires(() => Platform != null || All)
+        .Requires(() => Platform != null || All || IncludeHost)
         .Executes(async () =>
         {
-            if (!string.IsNullOrEmpty(Platform) && All)
-            {
-                throw new Exception("Cannot specify both --platform and --all");
-            }
 
-            if (All)
-            {
-                await DownloadAllPlatformsAsync(ImpellerSha);
-            }
-            else
-            {
-                if (!SupportedPlatforms.Contains(Platform))
-                {
-                    throw new Exception($"Invalid platform: {Platform}. Valid platforms: {string.Join(", ", SupportedPlatforms)}");
-                }
-                await DownloadPlatformAsync(ImpellerSha, Platform);
-            }
+            await DownloadRequestedPlatformsAsync(ImpellerSha);
         });
 
     Target DownloadLatestImpeller => _ => _
         .Description("Download Impeller SDK for the latest Flutter engine commit")
-        .Requires(() => Platform != null || All)
+        .Requires(() => Platform != null || All || IncludeHost)
         .Executes(async () =>
         {
-            if (!string.IsNullOrEmpty(Platform) && All)
-            {
-                throw new Exception("Cannot specify both --platform and --all");
-            }
 
             Log.Information("Fetching latest engine commit SHA...");
             var sha = GitTasks.Git("ls-remote " + EngineRepo + " HEAD", logOutput: false)
@@ -192,19 +177,73 @@ class Build : NukeBuild
             Log.Information("Latest SHA: {Sha}", sha);
             Log.Information("");
 
-            if (All)
-            {
-                await DownloadAllPlatformsAsync(sha);
-            }
-            else
-            {
-                if (!SupportedPlatforms.Contains(Platform))
-                {
-                    throw new Exception($"Invalid platform: {Platform}. Valid platforms: {string.Join(", ", SupportedPlatforms)}");
-                }
-                await DownloadPlatformAsync(sha, Platform);
-            }
+            await DownloadRequestedPlatformsAsync(sha);
         });
+
+    /// <summary>
+    /// The SDK platform matching this machine (e.g. darwin-arm64), or null if Impeller doesn't ship one.
+    /// Uses the OS architecture, matching the native-library selection in Impeller.targets.
+    /// </summary>
+    static string HostPlatform
+    {
+        get
+        {
+            var os = OperatingSystem.IsWindows() ? "windows"
+                : OperatingSystem.IsMacOS() ? "darwin"
+                : OperatingSystem.IsLinux() ? "linux"
+                : null;
+            var arch = RuntimeInformation.OSArchitecture switch
+            {
+                Architecture.X64 => "x64",
+                Architecture.Arm64 => "arm64",
+                _ => null
+            };
+            return os != null && arch != null ? $"{os}-{arch}" : null;
+        }
+    }
+
+    async Task DownloadRequestedPlatformsAsync(string sha)
+    {
+        if (All && (!string.IsNullOrEmpty(Platform) || IncludeHost))
+        {
+            throw new Exception("--all cannot be combined with --platform or --include-host");
+        }
+
+        if (All)
+        {
+            await DownloadAllPlatformsAsync(sha);
+            return;
+        }
+
+        var platforms = new List<string>();
+
+        if (!string.IsNullOrEmpty(Platform))
+        {
+            if (!SupportedPlatforms.Contains(Platform))
+            {
+                throw new Exception($"Invalid platform: {Platform}. Valid platforms: {string.Join(", ", SupportedPlatforms)}");
+            }
+            platforms.Add(Platform);
+        }
+
+        if (IncludeHost)
+        {
+            var host = HostPlatform;
+            if (host == null || !SupportedPlatforms.Contains(host))
+            {
+                throw new Exception($"No Impeller SDK available for this host ({RuntimeInformation.OSDescription}, {RuntimeInformation.OSArchitecture})");
+            }
+            if (!platforms.Contains(host))
+            {
+                platforms.Add(host);
+            }
+        }
+
+        foreach (var platform in platforms)
+        {
+            await DownloadPlatformAsync(sha, platform);
+        }
+    }
 
     async Task DownloadAllPlatformsAsync(string sha)
     {

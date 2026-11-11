@@ -14,7 +14,7 @@ You need the .NET 10 SDK. The exact version is pinned in `global.json`.
 ./build.sh GenerateBindings --platform linux-x64
 ```
 
-to automatically download and build the bindings.
+to build the bindings. This task does not download the SDK. Download the `linux-x64` SDK first with `./build.sh DownloadLatestImpeller --platform linux-x64`.
 
 2) Run the Sandbox sample. The runtime file used is based on the `Impeller.targets` file. You can either manually set up the library you want to test with, or use the Nuke tasks below for automatically setting it up per commit, or with the latest commit. 
 

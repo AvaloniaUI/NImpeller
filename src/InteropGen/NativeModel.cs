@@ -291,7 +291,7 @@ class NativeModel
             {
                 Name = f.Name,
                 ReturnType = MapType(f.ReturnType, f),
-                Parameters = f.Parameters.Select(p => new NativeVar(p.Name, MapType(p.Type))).ToList()
+                Parameters = f.Parameters.Select(p => MapVar(p, p.Name, p.Type)).ToList()
             });
         }
         

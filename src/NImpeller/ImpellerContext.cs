@@ -37,7 +37,7 @@ public unsafe partial class ImpellerContext
         };
         var res = UnsafeNativeMethods.ImpellerContextCreateVulkanNew(UnsafeNativeMethods.ImpellerVersion, &settings);
         handle.Free();
-        return res != null! ? new ImpellerContext(res) : null;
+        return ImpellerHandle.WrapOrNull(res, static h => new ImpellerContext(h));
     }
 
     public static ImpellerContext? CreateOpenGLESNew(Func<string, IntPtr> getProcAddress)
@@ -50,13 +50,13 @@ public unsafe partial class ImpellerContext
             (IntPtr)(delegate* unmanaged[Cdecl]<IntPtr, IntPtr, IntPtr>)&GetProcAddressCallback,
             GCHandle.ToIntPtr(handle));
         handle.Free();
-        return res != null! ? new ImpellerContext(res) : null;
+        return ImpellerHandle.WrapOrNull(res, static h => new ImpellerContext(h));
     }
 
     public static ImpellerContext? CreateMetalNew()
     {
         var res = UnsafeNativeMethods.ImpellerContextCreateMetalNew(UnsafeNativeMethods.ImpellerVersion);
-        return res != null! ? new ImpellerContext(res) : null;
+        return ImpellerHandle.WrapOrNull(res, static h => new ImpellerContext(h));
     }
 
     public ImpellerContextVulkanInfo? GetVulkanInfo()

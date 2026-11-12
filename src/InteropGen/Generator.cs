@@ -342,10 +342,11 @@ class Generator
                                     else if(f.ReturnType is NativeNullableType { ElementType: NativeHandle nativeHandleType})
                                     {
                                         // Mirror GenerateHandleReturn's New-based branch: New-suffixed
-                                        // functions return a SafeHandle from P/Invoke (compare to null);
-                                        // other handle-returning functions return a raw IntPtr (compare to IntPtr.Zero).
+                                        // functions return a SafeHandle from P/Invoke, where a native nullptr is an
+                                        // invalid handle; other handle-returning functions return a raw IntPtr
+                                        // (compare to IntPtr.Zero).
                                         if (f.Name.EndsWith("New"))
-                                            gen.Line("if(ret == null) return null;");
+                                            gen.Line("if(ret.IsInvalid) { ret.Dispose(); return null; }");
                                         else
                                             gen.Line("if(ret == global::System.IntPtr.Zero) return null;");
                                         GenerateHandleReturn(nativeHandleType);

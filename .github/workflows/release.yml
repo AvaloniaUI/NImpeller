@@ -1,0 +1,92 @@
+name: Release
+
+run-name: Release ${{ inputs.flutter_ref || 'latest stable Flutter' }} (revision ${{ inputs.revision }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      flutter_ref:
+        description: Flutter tag or commit to package (empty = latest stable tag)
+        type: string
+        required: false
+        default: ''
+      revision:
+        description: Binding revision on top of the same Flutter release (0 = none)
+        type: number
+        required: false
+        default: 0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          submodules: recursive
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      # Pack resolves the Flutter ref, engine hash and dev base version from a flutter/flutter
+      # clone. A blobless clone has all commits, trees and tags; file contents load on demand.
+      - name: Clone flutter/flutter (blobless)
+        run: git clone --filter=blob:none --no-checkout https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
+
+      # llvm-strip for the Android libraries comes from the runner's Android NDK (ANDROID_NDK_HOME).
+      - name: Pack
+        env:
+          FLUTTER_REF: ${{ inputs.flutter_ref }}
+          REVISION: ${{ inputs.revision }}
+        run: |
+          chmod +x ./build.sh
+          args=(Pack --flutter-root "$RUNNER_TEMP/flutter" --flutter-remote origin --no-fetch --revision "$REVISION")
+          if [ -n "$FLUTTER_REF" ]; then
+            args+=(--flutter-ref "$FLUTTER_REF")
+          fi
+          ./build.sh "${args[@]}"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Packages"
+            echo
+            for f in artifacts/packages/*.nupkg; do
+              echo "- \`$(basename "$f")\` ($(du -h "$f" | cut -f1))"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v7
+        with:
+          name: packages
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
+          retention-days: 7
+
+  # Separate job so the push runs under the 'release' environment and its secrets.
+  push:
+    needs: pack
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: packages
+          path: ./nupkgs
+
+      - name: Push to Release Manager
+        run: dotnet nuget push './nupkgs/*.nupkg' --api-key '${{ secrets.RELEASE_MANAGER_API_KEY }}' --source '${{ vars.RELEASE_MANAGER_UPLOAD_URL }}'

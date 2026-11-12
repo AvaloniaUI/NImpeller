@@ -78,7 +78,14 @@ generated `IMPELLER_VERSION`, and runs the unit tests. Packages go to `artifacts
 - `NImpeller`: managed bindings, depends on `NImpeller.Native` (exact version)
 - `NImpeller.Native`: meta package that depends on every RID package
 - `NImpeller.Native.<rid>`: `runtimes/<rid>/native/` for `linux-x64`, `linux-arm64`, `osx-x64`,
-  `osx-arm64`, `win-x64`, `win-arm64`
+  `osx-arm64`, `win-x64`, `win-arm64`, `android-arm64`, `android-arm`, `android-x64`
+
+### Releasing
+
+Run the Release workflow (`.github/workflows/release.yml`):
+
+- `flutter_ref`: Flutter tag or commit (empty = latest stable tag)
+- `revision`: binding revision on top of the same Flutter release (default `0`)
 
 ### Handles
 

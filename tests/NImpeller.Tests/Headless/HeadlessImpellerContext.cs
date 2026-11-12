@@ -128,6 +128,8 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
         _sdl?.Quit();
     }
 
+    public ImpellerContext Impeller => _impeller;
+
     public byte[] Render(IScene scene, int width, int height) =>
         Invoke(() => RenderToFbo(width, height,
             builder => scene.Render(_impeller, builder, new SceneParameters { Width = width, Height = height })));

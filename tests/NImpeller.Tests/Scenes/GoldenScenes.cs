@@ -587,7 +587,7 @@ public sealed class CpuTextureScene : IScene
             Mip_count = 1,
         };
 
-        using var texture = context.TextureCreateWithContentsNew(descriptor, mem, System.IntPtr.Zero)
+        using var texture = context.TextureCreateWithContentsNew(descriptor, mem)
             ?? throw new System.InvalidOperationException("TextureCreateWithContentsNew returned null");
 
         using var paint = ImpellerPaint.New()!;

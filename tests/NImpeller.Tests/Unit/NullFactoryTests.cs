@@ -13,6 +13,6 @@ public sealed class NullFactoryTests
     {
         // Not an impellerc-compiled runtime stage, so ImpellerFragmentProgramNew returns nullptr.
         using var mem = new ImpellerUnmanagedMemory(new byte[] { 1, 2, 3, 4 });
-        Assert.Null(ImpellerFragmentProgram.New(mem, System.IntPtr.Zero));
+        Assert.Null(ImpellerFragmentProgram.New(mem));
     }
 }

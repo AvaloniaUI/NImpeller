@@ -265,9 +265,22 @@ class Generator
                             if (!isFactory)
                                 args.RemoveAt(0);
                             
+                            // A mapping is always marshalled with on_release == NULL, which makes
+                            // Impeller copy the bytes during the call and never invoke a release
+                            // callback. The companion "*release_user_data" baton is unused, so
+                            // it is hidden from the public signature and passed as IntPtr.Zero.
+                            var hiddenParams = new HashSet<string>();
+                            for (var i = 1; i < args.Count; i++)
+                            {
+                                if (args[i].Type.IsVoidPtr && args[i].Name.EndsWith("release_user_data") &&
+                                    args[i - 1].Type is NativePointerType { ElementType: NativeStruct prevNs, Level: 1 } &&
+                                    manualMarshal.ContainsKey(prevNs.Name))
+                                    hiddenParams.Add(args[i].Name);
+                            }
+
                             var retType = MapDotnetType(f.ReturnType, true);
                             var decl = $"{retType} {name}(" +
-                                       string.Join(", ", args.Select(p =>
+                                       string.Join(", ", args.Where(p => !hiddenParams.Contains(p.Name)).Select(p =>
                                            (IsOutParam(p.Type) ? "out " : "") + MapDotnetType(p.Type, true) + " " + p.Name)) +
                                        ")";
                             if (isFactory)
@@ -291,7 +304,9 @@ class Generator
                                 {
                                     var a = args[index];
 
-                                    if (a.Type is NativeHandle)
+                                    if (hiddenParams.Contains(a.Name))
+                                        invocation += "global::System.IntPtr.Zero";
+                                    else if (a.Type is NativeHandle)
                                         invocation += $"{a.Name}.Handle";
                                     else if (a.Type is NativePointerType { ElementType: NativeStruct ns, Level: 1 } &&
                                              manualMarshal.ContainsKey(ns.Name))

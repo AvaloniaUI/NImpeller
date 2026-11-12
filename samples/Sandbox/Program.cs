@@ -20,7 +20,8 @@ static class Program
         new MMarkScene(),
         new ParagraphScene(),
         new CirclingSquares(),
-        new AnimatedGradientsScene()
+        new AnimatedGradientsScene(),
+        new FragmentProgramScene()
     ];
 
     public enum GraphicsApi

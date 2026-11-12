@@ -1,0 +1,71 @@
+<Project>
+  <!--
+    Packages libimpeller.so for each Android RuntimeIdentifier. Flutter's Android library ships with
+    debug info (~225 MB), so it is stripped into obj/ with the NDK's llvm-strip first, the same way
+    the Pack target and the Android Gradle plugin do it (strip-unneeded keeps .dynsym).
+
+    llvm-strip lookup: $(LlvmStrip), then ANDROID_NDK_HOME / ANDROID_NDK_ROOT / ANDROID_NDK, then the
+    newest NDK under ANDROID_HOME / ANDROID_SDK_ROOT / the default Android SDK locations.
+  -->
+  <PropertyGroup>
+    <ImpellerSdkDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', 'external', 'impeller_sdk'))</ImpellerSdkDirectory>
+    <ImpellerStrippedDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildProjectDirectory)', '$(BaseIntermediateOutputPath)', 'impeller'))</ImpellerStrippedDirectory>
+    <_LlvmStripExe Condition="$([MSBuild]::IsOSPlatform('Windows'))">llvm-strip.exe</_LlvmStripExe>
+    <_LlvmStripExe Condition="!$([MSBuild]::IsOSPlatform('Windows'))">llvm-strip</_LlvmStripExe>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <_ImpellerAndroidAbi Include="android-arm64" Rid="android-arm64" Abi="arm64-v8a" />
+    <_ImpellerAndroidAbi Include="android-arm" Rid="android-arm" Abi="armeabi-v7a" />
+    <_ImpellerAndroidAbi Include="android-x64" Rid="android-x64" Abi="x86_64" />
+    <_ImpellerAndroidAbi Include="android-x86" Rid="android-x86" Abi="x86" />
+  </ItemGroup>
+
+  <Target Name="_ResolveImpellerAndroidLibraries">
+    <PropertyGroup>
+      <_ImpellerRids>;$(RuntimeIdentifiers);$(RuntimeIdentifier);</_ImpellerRids>
+    </PropertyGroup>
+    <ItemGroup>
+      <_ImpellerAndroidLibrary Include="@(_ImpellerAndroidAbi->'$(ImpellerSdkDirectory)%(Rid)/lib/libimpeller.so')"
+                               Condition="$(_ImpellerRids.Contains(';%(Rid);'))" />
+      <_ImpellerAndroidLibrary Stripped="$(ImpellerStrippedDirectory)%(Abi)/libimpeller.so" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(_ImpellerAndroidLibrary.FullPath)')"
+           Text="Impeller SDK not found at %(_ImpellerAndroidLibrary.FullPath). Run: ./build.sh DownloadLatestImpeller --platform %(_ImpellerAndroidLibrary.Rid)" />
+  </Target>
+
+  <Target Name="_FindLlvmStrip" Condition="'$(LlvmStrip)' == ''">
+    <ItemGroup>
+      <_NdkRoot Include="$(ANDROID_NDK_HOME);$(ANDROID_NDK_ROOT);$(ANDROID_NDK)" />
+      <_SdkRoot Include="$(ANDROID_HOME);$(ANDROID_SDK_ROOT);$(HOME)/Library/Android/sdk;$(HOME)/Android/Sdk;$(LOCALAPPDATA)/Android/Sdk" />
+      <_NdkStripCandidate Include="%(_NdkRoot.Identity)/toolchains/llvm/prebuilt/*/bin/$(_LlvmStripExe)" />
+      <_SdkNdkStripCandidate Include="%(_SdkRoot.Identity)/ndk/*/toolchains/llvm/prebuilt/*/bin/$(_LlvmStripExe)" />
+    </ItemGroup>
+    <PropertyGroup>
+      <_NdkStrips>@(_NdkStripCandidate->'%(FullPath)')</_NdkStrips>
+      <_SdkNdkStrips>@(_SdkNdkStripCandidate->'%(FullPath)')</_SdkNdkStrips>
+      <!-- An explicit NDK wins; otherwise take the last SDK match (globs list NDK versions ascending). -->
+      <LlvmStrip Condition="'$(_NdkStrips)' != ''">$([System.String]::Copy('$(_NdkStrips);').Substring(0, $([System.String]::Copy('$(_NdkStrips);').IndexOf(';'))))</LlvmStrip>
+      <LlvmStrip Condition="'$(LlvmStrip)' == '' AND '$(_SdkNdkStrips)' != ''">$(_SdkNdkStrips.Substring($([MSBuild]::Add($(_SdkNdkStrips.LastIndexOf(';')), 1))))</LlvmStrip>
+    </PropertyGroup>
+    <Error Condition="'$(LlvmStrip)' == '' OR !Exists('$(LlvmStrip)')"
+           Text="llvm-strip not found. Install the Android NDK, set ANDROID_NDK_HOME, or pass -p:LlvmStrip=&lt;path&gt;." />
+  </Target>
+
+  <Target Name="_StripImpellerAndroidLibraries"
+          DependsOnTargets="_ResolveImpellerAndroidLibraries;_FindLlvmStrip"
+          Inputs="@(_ImpellerAndroidLibrary)"
+          Outputs="%(_ImpellerAndroidLibrary.Stripped)">
+    <MakeDir Directories="$([System.IO.Path]::GetDirectoryName('%(_ImpellerAndroidLibrary.Stripped)'))" />
+    <Exec Command="&quot;$(LlvmStrip)&quot; --strip-unneeded -o &quot;%(_ImpellerAndroidLibrary.Stripped)&quot; &quot;%(_ImpellerAndroidLibrary.FullPath)&quot;" />
+    <Message Importance="high" Text="Stripped %(_ImpellerAndroidLibrary.Abi) libimpeller.so -> %(_ImpellerAndroidLibrary.Stripped)" />
+  </Target>
+
+  <Target Name="_AddImpellerAndroidLibraries"
+          BeforeTargets="BeforeBuild"
+          DependsOnTargets="_StripImpellerAndroidLibraries">
+    <ItemGroup>
+      <AndroidNativeLibrary Include="%(_ImpellerAndroidLibrary.Stripped)" Abi="%(_ImpellerAndroidLibrary.Abi)" />
+    </ItemGroup>
+  </Target>
+</Project>

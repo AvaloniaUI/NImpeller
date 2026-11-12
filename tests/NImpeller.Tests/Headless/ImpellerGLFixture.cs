@@ -15,6 +15,8 @@ public sealed class ImpellerGLFixture : IDisposable
 
     public bool IsSoftwareRenderer => _context.IsSoftwareRenderer;
 
+    public ImpellerContext Context => _context.Impeller;
+
     public RawImage Render(IScene scene, int width, int height) =>
         new(width, height, _context.Render(scene, width, height));
 

@@ -15,13 +15,7 @@ static class Program
     private static readonly string[] AllApis = ["OpenGL", "Vulkan", "Metal"];
     private static readonly string[] NonMetalApis = ["OpenGL", "Vulkan"];
 
-    private static readonly IScene[] AvailableScenes =
-    [
-        new MMarkScene(),
-        new ParagraphScene(),
-        new CirclingSquares(),
-        new AnimatedGradientsScene()
-    ];
+    private static readonly IScene[] AvailableScenes = SceneCatalog.CreateAll();
 
     public enum GraphicsApi
     {

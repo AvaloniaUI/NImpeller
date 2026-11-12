@@ -103,6 +103,11 @@ class Generator
 
             string MapInteropType(NativeType type, bool allowHandles, bool allowStrings)
             {
+                if (type is NativeNullableType nt)
+                {
+                    var inner = MapInteropType(nt.ElementType, allowHandles, allowStrings);
+                    return nt.Nullable && inner == "string" ? "string?" : inner;
+                }
                 if (TryMapCommonType(type, allowStrings, out var common))
                     return common;
                 if (type is NativeHandle handle)
@@ -111,8 +116,6 @@ class Generator
                         return "global::System.IntPtr";
                     return $"{gns}.{handle.Name}Handle";
                 }
-                if (type is NativeNullableType nt)
-                    return MapInteropType(nt.ElementType, allowHandles, allowStrings); //TODO?
                 
                 if (type is NativePointerType pt)
                 {
@@ -177,7 +180,7 @@ class Generator
                         gen.Line("[System.Runtime.InteropServices.SuppressGCTransition]");
                     
                     if ((imp.Name.EndsWith("Release") || imp.Name.EndsWith("Retain")) && imp.Parameters.Count == 1 &&
-                        imp.Parameters[0].Type is NativeHandle)
+                        NativeNullableType.Unwrap(imp.Parameters[0].Type) is NativeHandle)
                     {
                         gen.Line($"public static partial void {imp.Name}(IntPtr handle);");
                     }
@@ -199,9 +202,16 @@ class Generator
 
             string MapDotnetType(NativeType type, bool allowHandles)
             {
-                if (type is NativePointerType { ElementType: NativeStruct ns, Level: 1 } &&
+                if (NativeNullableType.Unwrap(type) is NativePointerType { ElementType: NativeStruct ns, Level: 1 } &&
                     manualMarshal.TryGetValue(ns.Name, out var marshalled))
                     return marshalled;
+
+                if (type is NativeNullableType nt)
+                {
+                    var inner = MapDotnetType(nt.ElementType, allowHandles);
+                    // A nullable void* is still a plain IntPtr (IntPtr.Zero is null).
+                    return nt.Nullable && inner != "System.IntPtr" ? inner + "?" : inner;
+                }
                 
                 if (TryMapCommonType(type, true, out var common))
                     return common;
@@ -214,8 +224,6 @@ class Generator
                 }
                 if(type.IsGenericDataPointer)
                     throw new UseManualInteropException();
-                if (type is NativeNullableType nt)
-                    return MapDotnetType(nt.ElementType, allowHandles) + "?";
                 if (type is NativePointerType pt)
                 {
                     if (pt.Level != 1)
@@ -265,9 +273,22 @@ class Generator
                             if (!isFactory)
                                 args.RemoveAt(0);
                             
+                            // A mapping is always marshalled with on_release == NULL, which makes
+                            // Impeller copy the bytes during the call and never invoke a release
+                            // callback. The companion "*release_user_data" baton is unused, so
+                            // it is hidden from the public signature and passed as IntPtr.Zero.
+                            var hiddenParams = new HashSet<string>();
+                            for (var i = 1; i < args.Count; i++)
+                            {
+                                if (args[i].Type.IsVoidPtr && args[i].Name.EndsWith("release_user_data") &&
+                                    NativeNullableType.Unwrap(args[i - 1].Type) is NativePointerType { ElementType: NativeStruct prevNs, Level: 1 } &&
+                                    manualMarshal.ContainsKey(prevNs.Name))
+                                    hiddenParams.Add(args[i].Name);
+                            }
+
                             var retType = MapDotnetType(f.ReturnType, true);
                             var decl = $"{retType} {name}(" +
-                                       string.Join(", ", args.Select(p =>
+                                       string.Join(", ", args.Where(p => !hiddenParams.Contains(p.Name)).Select(p =>
                                            (IsOutParam(p.Type) ? "out " : "") + MapDotnetType(p.Type, true) + " " + p.Name)) +
                                        ")";
                             if (isFactory)
@@ -290,10 +311,17 @@ class Generator
                                 for (var index = 0; index < args.Count; index++)
                                 {
                                     var a = args[index];
+                                    var argType = NativeNullableType.Unwrap(a.Type);
+                                    var argNullable = a.Type is NativeNullableType { Nullable: true };
 
-                                    if (a.Type is NativeHandle)
-                                        invocation += $"{a.Name}.Handle";
-                                    else if (a.Type is NativePointerType { ElementType: NativeStruct ns, Level: 1 } &&
+                                    if (hiddenParams.Contains(a.Name))
+                                        invocation += "global::System.IntPtr.Zero";
+                                    else if (argType is NativeHandle argHandle)
+                                        // An invalid SafeHandle marshals as nullptr.
+                                        invocation += argNullable
+                                            ? $"({a.Name}?.Handle ?? new {argHandle.Name}Handle())"
+                                            : $"{a.Name}.Handle";
+                                    else if (argType is NativePointerType { ElementType: NativeStruct ns, Level: 1 } &&
                                              manualMarshal.ContainsKey(ns.Name))
                                     {
                                         gen.Line($"using var __marshal_{a.Name} = {ns.Name}.Marshal({a.Name});");
@@ -307,8 +335,17 @@ class Generator
                                         invocation += $"&__{a.Name}";
                                         outParams.Add(a.Name);
                                     }
-                                    else if (a.Type is NativePointerType { IsString: false, Level: 1, IsGenericDataPointer: false, IsVoidPtr: false })
-                                        invocation += $"&{a.Name}";
+                                    else if (argType is NativePointerType { IsString: false, Level: 1, IsGenericDataPointer: false, IsVoidPtr: false } structPtr)
+                                    {
+                                        if (argNullable)
+                                        {
+                                            var elemType = MapDotnetType(structPtr.ElementType, false);
+                                            gen.Line($"{elemType} __{a.Name} = {a.Name}.GetValueOrDefault();");
+                                            invocation += $"({a.Name}.HasValue ? &__{a.Name} : null)";
+                                        }
+                                        else
+                                            invocation += $"&{a.Name}";
+                                    }
                                     else
                                         invocation += a.Name;
 
@@ -342,10 +379,11 @@ class Generator
                                     else if(f.ReturnType is NativeNullableType { ElementType: NativeHandle nativeHandleType})
                                     {
                                         // Mirror GenerateHandleReturn's New-based branch: New-suffixed
-                                        // functions return a SafeHandle from P/Invoke (compare to null);
-                                        // other handle-returning functions return a raw IntPtr (compare to IntPtr.Zero).
+                                        // functions return a SafeHandle from P/Invoke, where a native nullptr is an
+                                        // invalid handle; other handle-returning functions return a raw IntPtr
+                                        // (compare to IntPtr.Zero).
                                         if (f.Name.EndsWith("New"))
-                                            gen.Line("if(ret == null) return null;");
+                                            gen.Line("if(ret.IsInvalid) { ret.Dispose(); return null; }");
                                         else
                                             gen.Line("if(ret == global::System.IntPtr.Zero) return null;");
                                         GenerateHandleReturn(nativeHandleType);

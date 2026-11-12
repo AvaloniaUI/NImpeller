@@ -111,5 +111,5 @@ public partial class ImpellerColorSource
     }
 
     private static ImpellerColorSource? Wrap(ImpellerColorSourceHandle ret) =>
-        ret == null ? null : new ImpellerColorSource(ret);
+        ImpellerHandle.WrapOrNull(ret, static h => new ImpellerColorSource(h));
 }

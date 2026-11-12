@@ -20,6 +20,20 @@ to build the bindings. It uses the SDK for your own platform and downloads it if
 
 It will only work for platforms where SDL2 can create a GLES context. I've only tested it with Linux with an Intel iGPU, so good luck.
 
+#### Android Sandbox
+
+`samples/Sandbox.Android` runs the same scenes on Android (API 29+, arm64 and x64) with OpenGL ES or Vulkan. It needs the `android` workload and the Android NDK, which the build uses to strip `libimpeller.so` (about 225 MB unstripped). The project is not in `NImpeller.slnx`, so the solution still builds without the Android workload.
+
+```sh
+./build.sh DownloadLatestImpeller --platform android-arm64
+./build.sh DownloadLatestImpeller --platform android-x64
+dotnet build samples/Sandbox.Android -t:Run
+# Open a scene directly:
+adb shell am start -n com.nimpeller.sandbox/.RenderActivity --es scene shaders --es api OpenGLES
+```
+
+Vulkan currently shows a single stretched pixel: Impeller's C API creates the swapchain at 1x1 and does not resize it on Android (TODO(163070) in `khr_swapchain_vk.cc`).
+
 ### Using pre-build Impeller binaries
 
 Flutter builds toolkit binaries on a nightly feed, that you can download from.

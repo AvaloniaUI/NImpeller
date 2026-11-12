@@ -587,7 +587,7 @@ public sealed class CpuTextureScene : IScene
             Mip_count = 1,
         };
 
-        using var texture = context.TextureCreateWithContentsNew(descriptor, mem, System.IntPtr.Zero)
+        using var texture = context.TextureCreateWithContentsNew(descriptor, mem)
             ?? throw new System.InvalidOperationException("TextureCreateWithContentsNew returned null");
 
         using var paint = ImpellerPaint.New()!;
@@ -686,3 +686,78 @@ public sealed class SolidShapesScene : IScene
     }
 }
 
+
+/// <summary>
+/// A fragment-program color source (a tinted texture) and a fragment-program image filter (color
+/// inversion over a layer). Shader sources are in <c>Shaders/</c>.
+/// </summary>
+public sealed class FragmentProgramScene : IScene
+{
+    public string TestName => "fragmentprogram";
+    public string Description => "Custom shaders as a color source and as an image filter.";
+
+    public static ImpellerFragmentProgram LoadProgram(string name)
+    {
+        var path = System.IO.Path.Combine(System.AppContext.BaseDirectory, "Shaders", name + ".frag.iplr");
+        using var mem = new ImpellerUnmanagedMemory(System.IO.File.ReadAllBytes(path));
+        return Draw.NotNull(ImpellerFragmentProgram.New(mem));
+    }
+
+    // A deterministic 2x2 RGBA texture: red, green / blue, white.
+    public static ImpellerTexture CreateQuadTexture(ImpellerContext context)
+    {
+        byte[] pixels =
+        {
+            255, 0, 0, 255,   0, 255, 0, 255,
+            0, 0, 255, 255,   255, 255, 255, 255,
+        };
+        using var mem = new ImpellerUnmanagedMemory(pixels);
+        var descriptor = new ImpellerTextureDescriptor
+        {
+            Pixel_format = ImpellerPixelFormat.kImpellerPixelFormatRGBA8888,
+            Size = new ImpellerISize(2, 2),
+            Mip_count = 1,
+        };
+        return Draw.NotNull(context.TextureCreateWithContentsNew(descriptor, mem));
+    }
+
+    public void Render(ImpellerContext context, ImpellerDisplayListBuilder b, SceneParameters p)
+    {
+        Draw.Background(b, ImpellerColor.FromRgb(30, 30, 36));
+        using var texture = CreateQuadTexture(context);
+
+        // Left: the texture stretched over a 120x120 rect, tinted orange by the shader.
+        using (var program = LoadProgram("tinted_texture"))
+        {
+            // uSize (vec2), uTint (vec4).
+            float[] uniforms = { 120, 120, 1.0f, 0.6f, 0.2f, 1.0f };
+            using var source = Draw.NotNull(ImpellerColorSource.CreateFragmentProgramNew(
+                context, program, new[] { texture }, uniforms));
+            using var paint = ImpellerPaint.New()!;
+            paint.SetColorSource(source);
+            b.Save();
+            b.Translate(20, 30);
+            b.DrawRect(new ImpellerRect(0, 0, 120, 120), paint);
+            b.Restore();
+        }
+
+        // Right: shapes drawn into a layer whose contents the shader inverts.
+        using (var program = LoadProgram("invert_filter"))
+        {
+            // uSize (vec2) is written by Impeller; sampler 0 is replaced by the layer contents.
+            float[] uniforms = { 0, 0 };
+            using var filter = Draw.NotNull(ImpellerImageFilter.CreateFragmentProgramNew(
+                context, program, new[] { texture }, uniforms));
+            using var layerPaint = ImpellerPaint.New()!;
+            layerPaint.SetImageFilter(filter);
+            b.SaveLayer(new ImpellerRect(160, 30, 120, 120), layerPaint, null);
+
+            using var paint = ImpellerPaint.New()!;
+            paint.SetColor(ImpellerColor.FromRgb(240, 200, 70));
+            b.DrawRect(new ImpellerRect(160, 30, 120, 60), paint);
+            paint.SetColor(ImpellerColor.FromRgb(80, 140, 240));
+            b.DrawOval(new ImpellerRect(180, 70, 80, 80), paint);
+            b.Restore();
+        }
+    }
+}

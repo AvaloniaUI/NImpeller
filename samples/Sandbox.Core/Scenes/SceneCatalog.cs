@@ -24,5 +24,6 @@ public static class SceneCatalog
         new LayersScene(),
         new StrokesScene(),
         new GradientTileModesScene(),
+        new PathsScene(),
     ];
 }

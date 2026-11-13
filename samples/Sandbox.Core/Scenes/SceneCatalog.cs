@@ -20,5 +20,6 @@ public static class SceneCatalog
         new CustomFontScene(),
         new TextureShadersScene(),
         new BackdropBlurScene(),
+        new BlendModesScene(),
     ];
 }

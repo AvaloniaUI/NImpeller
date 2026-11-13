@@ -25,5 +25,6 @@ public static class SceneCatalog
         new StrokesScene(),
         new GradientTileModesScene(),
         new PathsScene(),
+        new BlurScene(),
     ];
 }

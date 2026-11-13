@@ -21,7 +21,7 @@ public sealed class StrokesScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(17, 17, 17));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 14f * k, header = 20f * k;
         float leftW = (p.Width - pad * 3f) * 0.62f;
         float rightW = p.Width - pad * 3f - leftW;

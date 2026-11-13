@@ -22,7 +22,7 @@ public sealed class TextMetricsScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(250, 250, 252));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 16f * k;
         float width = p.Width - pad * 2f;
         if (width <= 1f) return;

@@ -25,7 +25,7 @@ public sealed class PathsScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(246, 246, 248));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 14f * k, header = 20f * k;
         const int cols = 3, rows = 2;
         float cw = (p.Width - pad * (cols + 1)) / cols;

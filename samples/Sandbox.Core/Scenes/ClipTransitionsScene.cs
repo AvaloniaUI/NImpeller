@@ -24,8 +24,8 @@ public sealed class ClipTransitionsScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(20, 22, 28));
 
-        float k = MathF.Max(1f, p.Height / 640f);
-        float pad = 14f * k, bar = 22f * k, left = 230f * k;
+        float k = Draw.Scale(p);
+        float pad = 14f * k, bar = 22f * k, left = MathF.Min(230f * k, p.Width * 0.3f);
         float gridW = p.Width - left - pad * 2f;
         float gridH = p.Height - pad * 3f - bar;
         if (gridW <= 1f || gridH <= 1f) return;

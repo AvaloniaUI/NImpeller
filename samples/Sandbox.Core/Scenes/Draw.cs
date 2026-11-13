@@ -4,6 +4,9 @@ namespace Sandbox.Scenes;
 
 internal static class Draw
 {
+    // Sizes are authored for an 900x640 canvas; scale up for larger ones without overflowing either axis.
+    public static float Scale(SceneParameters p) => MathF.Max(1f, MathF.Min(p.Width / 900f, p.Height / 640f));
+
     public static ImpellerRect Rect(float x, float y, float w, float h) =>
         new() { X = x, Y = y, Width = w, Height = h };
 

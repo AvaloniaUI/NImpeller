@@ -19,7 +19,7 @@ public sealed class ShadowsScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(214, 218, 226));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 20f * k, header = 28f * k;
         const int cols = 4, rows = 2;
         float cw = (p.Width - pad * (cols + 1)) / cols;

@@ -19,7 +19,7 @@ public sealed class TextFeaturesScene : IScene, IDisposable
     {
         Background(b, ImpellerColor.FromRgb(255, 255, 255));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 16f * k;
         float width = p.Width - pad * 2f;
         if (width <= 1f) return;

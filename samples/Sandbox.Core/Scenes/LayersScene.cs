@@ -26,7 +26,7 @@ public sealed class LayersScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(30, 32, 40));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 14f * k, header = 20f * k;
         float cw = (p.Width - pad * (Cols + 1)) / Cols;
         float ch = (p.Height - pad * (Rows + 1)) / Rows - header;

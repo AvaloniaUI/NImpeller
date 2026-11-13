@@ -26,7 +26,7 @@ public sealed class TextureShadersScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(24, 26, 32));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 16f * k, header = 20f * k;
         float topH = (p.Height - pad * 3f) * 0.55f - header;
         float botH = (p.Height - pad * 3f) * 0.45f - header;

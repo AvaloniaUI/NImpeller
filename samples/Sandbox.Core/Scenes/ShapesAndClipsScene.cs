@@ -21,7 +21,7 @@ public sealed class ShapesAndClipsScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(246, 246, 248));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 14f * k, header = 20f * k;
         const int rows = 4;
         float cw = (p.Width - pad * (Cols + 1)) / Cols;

@@ -29,7 +29,7 @@ public sealed class GradientTileModesScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(28, 30, 38));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 10f * k, labelW = 64f * k, header = 18f * k;
         const int cols = 5, rows = 5;
         float cw = (p.Width - labelW - pad * (cols + 1)) / cols;

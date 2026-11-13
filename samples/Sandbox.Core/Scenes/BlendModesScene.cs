@@ -31,7 +31,7 @@ public sealed class BlendModesScene : IScene, IDisposable
         Background(b, ImpellerColor.FromRgb(36, 38, 46));
         var modes = Enum.GetValues<ImpellerBlendMode>();
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 10f * k, header = 22f * k, label = 16f * k;
         int rows = (modes.Length + Cols - 1) / Cols;
         float cw = (p.Width - pad * (Cols + 1)) / Cols;

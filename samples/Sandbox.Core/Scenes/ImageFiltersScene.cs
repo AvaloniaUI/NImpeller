@@ -26,7 +26,7 @@ public sealed class ImageFiltersScene : IScene, IDisposable
         float pulse = 0.5f + 0.5f * MathF.Sin(t * 1.5f);
         Background(b, ImpellerColor.FromRgb(24, 26, 32));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 16f * k, header = 22f * k;
         const int cols = 4, rows = 2;
         float cw = (p.Width - pad * (cols + 1)) / cols;

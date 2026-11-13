@@ -26,7 +26,7 @@ public sealed class TextTransformsScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(250, 250, 252));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 12f * k, header = 18f * k;
         const int cols = 3, rows = 3;
         float cw = (p.Width - pad * (cols + 1)) / cols;

@@ -22,7 +22,7 @@ public sealed class BackdropBlurScene : IScene, IDisposable
         float t = (float)_clock.Elapsed.TotalSeconds;
         Background(b, ImpellerColor.FromRgb(255, 255, 255));
 
-        float k = MathF.Max(1f, p.Height / 640f);
+        float k = Draw.Scale(p);
         float pad = 14f * k, header = 20f * k;
         float cw = (p.Width - pad * 3f) / 2f;
         float ch = (p.Height - pad * 3f) / 2f - header;

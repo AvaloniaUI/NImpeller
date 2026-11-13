@@ -56,12 +56,27 @@ public unsafe class SdlApplication : IApplication
         };
     }
 
+    // SDL only dlopens libvulkan from the default search path, which excludes Homebrew's /opt/homebrew/lib.
+    private static readonly string[] MacVulkanLoaders =
+    [
+        "/opt/homebrew/lib/libvulkan.1.dylib",
+        "/usr/local/lib/libvulkan.1.dylib",
+    ];
+
     public bool Initialize(int width = 1600, int height = 900, string title = "NImpeller on SDL")
     {
         if (_sdl.Init(Sdl.InitVideo) < 0)
         {
             _logger.LogError("SDL initialization failed: {Error}", _sdl.GetErrorS());
             return false;
+        }
+
+        if (_apiType == GraphicsApi.Vulkan && RuntimeInformation.IsOSPlatform(OSPlatform.OSX)
+            && string.IsNullOrEmpty(Environment.GetEnvironmentVariable("SDL_VULKAN_LIBRARY"))
+            && MacVulkanLoaders.FirstOrDefault(File.Exists) is { } loader
+            && _sdl.VulkanLoadLibrary(loader) != 0)
+        {
+            _logger.LogWarning("Could not load {Loader}: {Error}", loader, _sdl.GetErrorS());
         }
 
         if (_apiType == GraphicsApi.OpenGL)

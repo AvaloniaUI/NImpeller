@@ -1,8 +1,10 @@
-# Impeller .NET bindings
+# NImpeller - .NET Bindings for Impeller
+
+NImpeller are .NET Bindings for [Impeller](https://github.com/flutter/flutter/tree/master/engine/src/flutter/impeller), the rendering runtime for Flutter.
 
 The general approach for NImpeller is to treat impeller.h as the only source of truth and manually write only some convenience code or code dealing with native->managed callbacks (there is only a few of those). The generator is supposed to generate the entire P/Invoke layer and at least 90% of .NET classes exposed as the public API.
 
-Generated bindings file is NOT checked out into the repo, because right now the bindings considered to be versionless, i. e. being compatible with any version of impeller.h. You can find an example of generated code [here](https://gist.github.com/kekekeks/cc8b7dfbf2dae07e55ca9d4ee6a8e2d6) if you don't want to clone/build the repo and want a sneak peek.
+Generated bindings file are NOT checked into the repo. Instead, versions are bound by generators and CI. Specific breaking API changes are split into branches and are bundled into Nuget packages. The bindings are intended to be slim and only require what is needed to operate the SDK, to make it easier to work with any upstream changes.
 
 ### Running this thing
 
@@ -18,11 +20,9 @@ to build the bindings. It uses the SDK for your own platform and downloads it if
 
 2) Run the Sandbox sample. The runtime file used is based on the `Impeller.targets` file. You can either manually set up the library you want to test with, or use the Nuke tasks below for automatically setting it up per commit, or with the latest commit. 
 
-It will only work for platforms where SDL2 can create a GLES context. I've only tested it with Linux with an Intel iGPU, so good luck.
-
 #### Android Sandbox
 
-`samples/Sandbox.Android` runs the same scenes on Android (API 29+, arm64 and x64) with OpenGL ES or Vulkan. It needs the `android` workload and the Android NDK, which the build uses to strip `libimpeller.so` (about 225 MB unstripped). The project is not in `NImpeller.slnx`, so the solution still builds without the Android workload.
+`samples/Sandbox.Android` runs the same scenes on Android with OpenGL ES or Vulkan. It needs the `android` workload and the Android NDK, which the build uses to strip `libimpeller.so` (about 225 MB unstripped). The project is not in `NImpeller.slnx`, so the solution still builds without the Android workload.
 
 ```sh
 ./build.sh DownloadLatestImpeller --platform android-arm64
@@ -32,7 +32,7 @@ dotnet build samples/Sandbox.Android -t:Run
 adb shell am start -n com.nimpeller.sandbox/.RenderActivity --es scene shaders --es api OpenGLES
 ```
 
-Vulkan currently shows a single stretched pixel: Impeller's C API creates the swapchain at 1x1 and does not resize it on Android (TODO(163070) in `khr_swapchain_vk.cc`).
+**NOTE:** The Impeller C SDK and upstream libraries are broken for Vulkan on Android. It currently shows a single stretched pixel on swapchain at 1x1 and does not resize it on Android [(TODO(163070) in `khr_swapchain_vk.cc`)](https://github.com/flutter/flutter/blob/6b2bb92cec12bc71e01dd04b659e863e0b3c6d6f/engine/src/flutter/impeller/renderer/backend/vulkan/swapchain/khr/khr_swapchain_vk.cc#L76).
 
 ### Using pre-build Impeller binaries
 
@@ -146,10 +146,4 @@ dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj
 
 or run `./test-headless.sh`
 
-The rendering tests need Linux with Mesa `llvmpipe` (software GL). The test assembly sets the Mesa and SDL environment variables for this itself. On macOS, the rendering tests are skipped.
-
-To run one test class, use an xUnit filter, for example:
-
-```sh
-dotnet test tests/NImpeller.Tests/NImpeller.Tests.csproj --filter-class "*GoldenImageTests"
-```
+The rendering tests need Linux with Mesa `llvmpipe` for software GL. The test assembly sets the Mesa and SDL environment variables for this itself.

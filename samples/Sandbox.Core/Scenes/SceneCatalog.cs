@@ -33,5 +33,6 @@ public static class SceneCatalog
         new SaveLayerTestsScene(),
         new TransformsAndImagesScene(),
         new RoundRectsScene(),
+        new RuntimeEffectsScene(),
     ];
 }

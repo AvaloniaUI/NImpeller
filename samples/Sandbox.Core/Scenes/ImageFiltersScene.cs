@@ -14,12 +14,11 @@ public sealed class ImageFiltersScene : IScene, IDisposable
     public string CommandLineName => "imagefilters";
     public string Description => "A CPU-generated texture drawn plain and through blur, dilate, erode, matrix, composed, color-matrix and mask-blur filters";
 
-    private const int TextureSize = 256;
+    private const int TextureSize = SampleTexture.Size;
 
     private readonly Stopwatch _clock = Stopwatch.StartNew();
     private readonly ImpellerTypographyContext _tc = ImpellerTypographyContext.New()!;
-    private ImpellerContext? _textureContext;
-    private ImpellerTexture? _texture;
+    private readonly SampleTexture _texture = new();
 
     public void Render(ImpellerContext context, ImpellerDisplayListBuilder b, SceneParameters p)
     {
@@ -34,7 +33,7 @@ public sealed class ImageFiltersScene : IScene, IDisposable
         float ch = (p.Height - pad * (rows + 1)) / rows - header;
         if (cw <= 1f || ch <= 1f) return;
 
-        var texture = GetTexture(context);
+        var texture = _texture.Get(context);
         string[] labels = ["Original", "Blur", "Dilate", "Erode", "Matrix", "Erode + blur", "Sepia color matrix", "Mask blur"];
 
         for (int i = 0; i < labels.Length; i++)
@@ -125,47 +124,9 @@ public sealed class ImageFiltersScene : IScene, IDisposable
         return ImpellerColorFilter.CreateColorMatrixNew(matrix)!;
     }
 
-    private ImpellerTexture GetTexture(ImpellerContext context)
-    {
-        if (_texture is not null && ReferenceEquals(_textureContext, context)) return _texture;
-
-        _texture?.Dispose();
-        var pixels = new byte[TextureSize * TextureSize * 4];
-        for (int y = 0; y < TextureSize; y++)
-        {
-            for (int x = 0; x < TextureSize; x++)
-            {
-                float u = x / (float)TextureSize, v = y / (float)TextureSize;
-                var c = Hsv(u * 0.8f + v * 0.2f, 0.55f, 0.35f + 0.5f * v);
-                float dx = u - 0.5f, dy = v - 0.5f, r = MathF.Sqrt(dx * dx + dy * dy);
-                if (r is > 0.18f and < 0.24f) c = Hsv(0.12f, 0.9f, 1f);
-                if (x % 32 == 0 || y % 32 == 0) c = new ImpellerColor { Red = 1, Green = 1, Blue = 1, Alpha = 1 };
-                if (((x / 8) + (y / 8)) % 2 == 0 && x > 176 && y > 176) c = new ImpellerColor { Alpha = 1 };
-
-                int i = (y * TextureSize + x) * 4;
-                pixels[i] = (byte)(c.Red * 255f);
-                pixels[i + 1] = (byte)(c.Green * 255f);
-                pixels[i + 2] = (byte)(c.Blue * 255f);
-                pixels[i + 3] = 255;
-            }
-        }
-
-        using var mem = new ImpellerUnmanagedMemory(pixels);
-        var descriptor = new ImpellerTextureDescriptor
-        {
-            Pixel_format = ImpellerPixelFormat.kImpellerPixelFormatRGBA8888,
-            Size = new ImpellerISize(TextureSize, TextureSize),
-            Mip_count = 1,
-        };
-        _texture = context.TextureCreateWithContentsNew(descriptor, mem)
-            ?? throw new InvalidOperationException("Could not create the texture.");
-        _textureContext = context;
-        return _texture;
-    }
-
     public void Dispose()
     {
-        _texture?.Dispose();
+        _texture.Dispose();
         _tc.Dispose();
     }
 }

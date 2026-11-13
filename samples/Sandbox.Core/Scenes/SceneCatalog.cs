@@ -18,5 +18,6 @@ public static class SceneCatalog
         new ClipTransitionsScene(),
         new TextMetricsScene(),
         new CustomFontScene(),
+        new TextureShadersScene(),
     ];
 }

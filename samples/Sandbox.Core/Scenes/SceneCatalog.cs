@@ -26,5 +26,6 @@ public static class SceneCatalog
         new GradientTileModesScene(),
         new PathsScene(),
         new BlurScene(),
+        new TextTransformsScene(),
     ];
 }

@@ -27,5 +27,6 @@ public static class SceneCatalog
         new PathsScene(),
         new BlurScene(),
         new TextTransformsScene(),
+        new ShadowPathsScene(),
     ];
 }

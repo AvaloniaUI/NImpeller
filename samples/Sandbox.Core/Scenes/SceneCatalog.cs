@@ -19,5 +19,6 @@ public static class SceneCatalog
         new TextMetricsScene(),
         new CustomFontScene(),
         new TextureShadersScene(),
+        new BackdropBlurScene(),
     ];
 }

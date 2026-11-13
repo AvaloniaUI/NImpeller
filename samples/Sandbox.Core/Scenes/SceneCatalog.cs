@@ -28,5 +28,6 @@ public static class SceneCatalog
         new BlurScene(),
         new TextTransformsScene(),
         new ShadowPathsScene(),
+        new ClipTestsScene(),
     ];
 }

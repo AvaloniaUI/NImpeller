@@ -15,5 +15,6 @@ public static class SceneCatalog
         new ImageFiltersScene(),
         new TextFeaturesScene(),
         new ShapesAndClipsScene(),
+        new ClipTransitionsScene(),
     ];
 }

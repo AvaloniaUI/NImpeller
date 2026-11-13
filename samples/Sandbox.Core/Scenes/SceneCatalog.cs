@@ -30,5 +30,6 @@ public static class SceneCatalog
         new ShadowPathsScene(),
         new ClipTestsScene(),
         new ArcsScene(),
+        new SaveLayerTestsScene(),
     ];
 }

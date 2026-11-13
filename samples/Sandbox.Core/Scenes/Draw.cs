@@ -56,11 +56,12 @@ internal static class Draw
         return pb.TakePathNew(fill)!;
     }
 
-    public static ImpellerPath Path(Action<ImpellerPathBuilder> build)
+    public static ImpellerPath Path(Action<ImpellerPathBuilder> build,
+        ImpellerFillType fill = ImpellerFillType.kImpellerFillTypeNonZero)
     {
         using var pb = ImpellerPathBuilder.New()!;
         build(pb);
-        return pb.TakePathNew(ImpellerFillType.kImpellerFillTypeNonZero)!;
+        return pb.TakePathNew(fill)!;
     }
 
     public static ImpellerParagraph Paragraph(ImpellerTypographyContext tc, string text, float size, ImpellerColor color,

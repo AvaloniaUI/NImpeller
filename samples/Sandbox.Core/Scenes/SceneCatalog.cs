@@ -21,5 +21,6 @@ public static class SceneCatalog
         new TextureShadersScene(),
         new BackdropBlurScene(),
         new BlendModesScene(),
+        new LayersScene(),
     ];
 }

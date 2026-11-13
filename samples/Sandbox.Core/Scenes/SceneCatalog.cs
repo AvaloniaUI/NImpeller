@@ -13,5 +13,6 @@ public static class SceneCatalog
         new FragmentProgramScene(),
         new ShadowsScene(),
         new ImageFiltersScene(),
+        new TextFeaturesScene(),
     ];
 }

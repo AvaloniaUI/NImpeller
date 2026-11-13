@@ -19,4 +19,9 @@
     <EmbeddedResource Include="Shaders/*.iplr" LogicalName="Shaders/%(Filename)%(Extension)" />
   </ItemGroup>
 
+  <!-- wtf.otf is the Impeller test fixture font; see Fonts/LICENSE.flutter. -->
+  <ItemGroup>
+    <EmbeddedResource Include="Fonts/*.otf" LogicalName="Fonts/%(Filename)%(Extension)" />
+  </ItemGroup>
+
 </Project>

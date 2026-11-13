@@ -17,5 +17,6 @@ public static class SceneCatalog
         new ShapesAndClipsScene(),
         new ClipTransitionsScene(),
         new TextMetricsScene(),
+        new CustomFontScene(),
     ];
 }

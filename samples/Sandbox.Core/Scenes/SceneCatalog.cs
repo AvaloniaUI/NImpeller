@@ -32,5 +32,6 @@ public static class SceneCatalog
         new ArcsScene(),
         new SaveLayerTestsScene(),
         new TransformsAndImagesScene(),
+        new RoundRectsScene(),
     ];
 }

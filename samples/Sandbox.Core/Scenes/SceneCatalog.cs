@@ -11,5 +11,6 @@ public static class SceneCatalog
         new CirclingSquares(),
         new AnimatedGradientsScene(),
         new FragmentProgramScene(),
+        new ShadowsScene(),
     ];
 }

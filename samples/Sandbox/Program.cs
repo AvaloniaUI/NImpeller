@@ -55,6 +55,8 @@ static class Program
         {
             builder
                 .AddDebug()
+                .AddConsole()
+                .AddFilter<Microsoft.Extensions.Logging.Console.ConsoleLoggerProvider>(null, LogLevel.Warning)
                 .SetMinimumLevel(LogLevel.Debug);
         });
 

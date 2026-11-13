@@ -45,8 +45,29 @@ public unsafe class GlfwApplication(GlfwApplication.GraphicsApi apiType = GlfwAp
         };
     }
 
+    // GLFW only dlopens libvulkan from the default search path, which excludes Homebrew's /opt/homebrew/lib.
+    private static readonly string[] MacVulkanLoaders =
+    [
+        "/opt/homebrew/lib/libvulkan.1.dylib",
+        "/usr/local/lib/libvulkan.1.dylib",
+    ];
+
+    private void InitMacVulkanLoader()
+    {
+        if (MacVulkanLoaders.FirstOrDefault(File.Exists) is not { } path) return;
+        var loader = NativeLibrary.Load(path);
+        var getInstanceProcAddr = NativeLibrary.GetExport(loader, "vkGetInstanceProcAddr");
+        var init = (delegate* unmanaged[Cdecl]<IntPtr, void>)_glfw.Context.GetProcAddress("glfwInitVulkanLoader");
+        init(getInstanceProcAddr);
+    }
+
     public bool Initialize(int width, int height, string title = "NImpeller on GLFW")
     {
+        if (apiType == GraphicsApi.Vulkan && RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            InitMacVulkanLoader();
+        }
+
         if (!_glfw.Init())
         {
             _logger.LogError("GLFW initialization failed.");
@@ -64,6 +85,17 @@ public unsafe class GlfwApplication(GlfwApplication.GraphicsApi apiType = GlfwAp
                 _glfw.WindowHint(WindowHintBool.OpenGLForwardCompat, true);
                 _glfw.WindowHint(WindowHintOpenGlProfile.OpenGlProfile, OpenGlProfile.Core);
             }
+        }
+
+        if (apiType == GraphicsApi.Vulkan)
+        {
+            if (!_glfw.VulkanSupported())
+            {
+                _logger.LogError("GLFW could not find a Vulkan loader.");
+                _glfw.Terminate();
+                return false;
+            }
+            _glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.NoApi);
         }
 
         _window = _glfw.CreateWindow(width, height, title, null, null);
@@ -96,20 +128,31 @@ public unsafe class GlfwApplication(GlfwApplication.GraphicsApi apiType = GlfwAp
             case GraphicsApi.Vulkan:
             {
                 _logger.LogInformation("Creating Vulkan context...");
-                _impellerContext = ImpellerContext.CreateVulkanNew(
+                var context = ImpellerContext.CreateVulkanNew(
                     (instance, procNamePtr) => _glfw.GetInstanceProcAddress(new VkHandle(instance), (byte*)procNamePtr),
-                    false)!;
+                    false);
+                if (context?.GetVulkanInfo() is not { } info)
+                {
+                    _logger.LogError("Impeller could not create a Vulkan context.");
+                    return false;
+                }
+                _impellerContext = context;
 
                 VkNonDispatchableHandle surfaceHandle;
-                _glfw.CreateWindowSurface(
-                    new VkHandle(_impellerContext.GetVulkanInfo()!.Value.Vk_instance),
-                    _window,
-                    null,
-                    &surfaceHandle
-                );
+                var result = _glfw.CreateWindowSurface(new VkHandle(info.Vk_instance), _window, null, &surfaceHandle);
+                if (result != 0)
+                {
+                    _logger.LogError("glfwCreateWindowSurface failed: {Result}", result);
+                    return false;
+                }
 
-                _vulkanSwapchain = _impellerContext.VulkanSwapchainCreateNew(
-                    new IntPtr((long)surfaceHandle.Handle))!;
+                var swapchain = _impellerContext.VulkanSwapchainCreateNew(new IntPtr((long)surfaceHandle.Handle));
+                if (swapchain is null)
+                {
+                    _logger.LogError("Impeller could not create a Vulkan swapchain.");
+                    return false;
+                }
+                _vulkanSwapchain = swapchain;
                 break;
             }
         }

@@ -31,6 +31,7 @@
     <ItemGroup>
         <PackageVersion Include="CommandLineParser" Version="2.9.1" />
         <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
+        <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
         <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
         <PackageVersion Include="SharpMetal" Version="1.1.0" />
         <PackageVersion Include="Silk.NET.GLFW" Version="2.22.0" />

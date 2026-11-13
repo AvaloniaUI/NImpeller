@@ -29,5 +29,6 @@ public static class SceneCatalog
         new TextTransformsScene(),
         new ShadowPathsScene(),
         new ClipTestsScene(),
+        new ArcsScene(),
     ];
 }

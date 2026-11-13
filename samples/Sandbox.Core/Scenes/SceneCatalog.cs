@@ -34,5 +34,6 @@ public static class SceneCatalog
         new TransformsAndImagesScene(),
         new RoundRectsScene(),
         new RuntimeEffectsScene(),
+        new LayerEdgeCasesScene(),
     ];
 }

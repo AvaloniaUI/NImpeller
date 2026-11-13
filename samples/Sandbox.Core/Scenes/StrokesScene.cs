@@ -39,7 +39,7 @@ public sealed class StrokesScene : IScene, IDisposable
 
         float x = pad * 2f + leftW;
         float cellH = (p.Height - pad * 4f) / 3f - header;
-        string[] labels = ["FatStrokeArc (animated width and sweep)", "Miter limit sweep", "Thick and thin curves"];
+        string[] labels = ["FatStrokeArc (animated width and sweep)", "Miter limit sweep (corners widen to the right)", "Thick and thin curves"];
         for (int i = 0; i < 3; i++)
         {
             float y = pad + i * (cellH + header + pad);
@@ -131,8 +131,8 @@ public sealed class StrokesScene : IScene, IDisposable
             int n = 7;
             for (int i = 0; i <= n; i++)
             {
-                float x = cell.X + cell.Width * (0.08f + 0.84f * i / n);
-                float y = cell.Y + cell.Height * (i % 2 == 0 ? 0.75f : 0.25f + 0.1f * i / n);
+                float x = cell.X + cell.Width * (0.06f + 0.88f * (i * (i + 1) / 2f) / (n * (n + 1) / 2f));
+                float y = cell.Y + cell.Height * (i % 2 == 0 ? 0.75f : 0.25f);
                 if (i == 0) pb.MoveTo(Point(x, y));
                 else pb.LineTo(Point(x, y));
             }

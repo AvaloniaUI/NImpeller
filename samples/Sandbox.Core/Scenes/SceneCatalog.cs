@@ -23,5 +23,6 @@ public static class SceneCatalog
         new BlendModesScene(),
         new LayersScene(),
         new StrokesScene(),
+        new GradientTileModesScene(),
     ];
 }

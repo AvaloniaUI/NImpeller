@@ -22,5 +22,6 @@ public static class SceneCatalog
         new BackdropBlurScene(),
         new BlendModesScene(),
         new LayersScene(),
+        new StrokesScene(),
     ];
 }

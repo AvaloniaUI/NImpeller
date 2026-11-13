@@ -1,0 +1,171 @@
+using System.Diagnostics;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
+using NImpeller;
+using static Sandbox.Scenes.Draw;
+
+namespace Sandbox.Scenes;
+
+/// <summary>Port of the interop <c>CanDrawImage</c> playground plus the image, color and mask filters the C API exposes.</summary>
+public sealed class ImageFiltersScene : IScene, IDisposable
+{
+    public string Name => "Image Filters";
+    public string CommandLineName => "imagefilters";
+    public string Description => "A CPU-generated texture drawn plain and through blur, dilate, erode, matrix, composed, color-matrix and mask-blur filters";
+
+    private const int TextureSize = 256;
+
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private readonly ImpellerTypographyContext _tc = ImpellerTypographyContext.New()!;
+    private ImpellerContext? _textureContext;
+    private ImpellerTexture? _texture;
+
+    public void Render(ImpellerContext context, ImpellerDisplayListBuilder b, SceneParameters p)
+    {
+        float t = (float)_clock.Elapsed.TotalSeconds;
+        float pulse = 0.5f + 0.5f * MathF.Sin(t * 1.5f);
+        Background(b, ImpellerColor.FromRgb(24, 26, 32));
+
+        float k = MathF.Max(1f, p.Height / 640f);
+        float pad = 16f * k, header = 22f * k;
+        const int cols = 4, rows = 2;
+        float cw = (p.Width - pad * (cols + 1)) / cols;
+        float ch = (p.Height - pad * (rows + 1)) / rows - header;
+        if (cw <= 1f || ch <= 1f) return;
+
+        var texture = GetTexture(context);
+        string[] labels = ["Original", "Blur", "Dilate", "Erode", "Matrix", "Erode + blur", "Sepia color matrix", "Mask blur"];
+
+        for (int i = 0; i < labels.Length; i++)
+        {
+            float x = pad + (i % cols) * (cw + pad);
+            float y = pad + (i / cols) * (ch + header + pad);
+            Label(b, _tc, labels[i], x, y, 13f * k, ImpellerColor.FromRgb(170, 176, 190));
+            y += header;
+
+            float size = MathF.Min(cw, ch);
+            var dst = Rect(x + (cw - size) / 2f, y + (ch - size) / 2f, size, size);
+
+            b.Save();
+            b.ClipRect(Rect(x, y, cw, ch), ImpellerClipOperation.kImpellerClipOperationIntersect);
+            if (i == 4)
+            {
+                b.Translate(dst.X + size / 2f, dst.Y + size / 2f);
+                dst = Rect(-size / 2f, -size / 2f, size, size);
+            }
+            using var paint = ImpellerPaint.New()!;
+            using var filter = CreateFilter(i, t, pulse, k);
+            if (filter is not null) paint.SetImageFilter(filter);
+            using var sepia = i == 6 ? Sepia() : null;
+            if (sepia is not null) paint.SetColorFilter(sepia);
+
+            if (i == 7)
+            {
+                DrawMaskBlur(b, texture, paint, dst, 2f + 10f * pulse * k);
+            }
+            else
+            {
+                b.DrawTextureRect(texture, Rect(0, 0, TextureSize, TextureSize), dst,
+                    ImpellerTextureSampling.kImpellerTextureSamplingLinear, paint);
+            }
+            b.Restore();
+        }
+    }
+
+    private static ImpellerImageFilter? CreateFilter(int index, float t, float pulse, float k)
+    {
+        switch (index)
+        {
+            case 1:
+                return ImpellerImageFilter.CreateBlurNew(1f + 9f * pulse * k, 1f + 9f * pulse * k, ImpellerTileMode.kImpellerTileModeDecal);
+            case 2:
+                return ImpellerImageFilter.CreateDilateNew(k * (0.5f + 3f * pulse), k * (0.5f + 3f * pulse));
+            case 3:
+                return ImpellerImageFilter.CreateErodeNew(k * (0.5f + 3f * pulse), k * (0.5f + 3f * pulse));
+            case 4:
+                var m = Matrix4x4.CreateRotationZ(MathF.Sin(t) * 0.5f) * Matrix4x4.CreateScale(0.8f, 0.8f, 1f);
+                return ImpellerImageFilter.CreateMatrixNew(m, ImpellerTextureSampling.kImpellerTextureSamplingLinear);
+            case 5:
+                using (var erode = ImpellerImageFilter.CreateErodeNew(2f * k, 2f * k)!)
+                using (var blur = ImpellerImageFilter.CreateBlurNew(k * (0.5f + 4f * pulse), k * (0.5f + 4f * pulse), ImpellerTileMode.kImpellerTileModeDecal)!)
+                {
+                    return blur.CreateComposeNew(erode);
+                }
+            default:
+                return null;
+        }
+    }
+
+    private static void DrawMaskBlur(ImpellerDisplayListBuilder b, ImpellerTexture texture, ImpellerPaint paint, ImpellerRect dst, float sigma)
+    {
+        float s = dst.Width / TextureSize;
+        var m = Matrix4x4.CreateScale(s, s, 1f) * Matrix4x4.CreateTranslation(dst.X, dst.Y, 0f);
+        using var source = texture.ColorSourceCreateImageNew(ImpellerTileMode.kImpellerTileModeClamp,
+            ImpellerTileMode.kImpellerTileModeClamp, ImpellerTextureSampling.kImpellerTextureSamplingLinear, m)!;
+        using var mask = ImpellerMaskFilter.CreateBlurNew(ImpellerBlurStyle.kImpellerBlurStyleNormal, sigma)!;
+        paint.SetColorSource(source);
+        paint.SetMaskFilter(mask);
+        float inset = dst.Width * 0.12f;
+        b.DrawRoundedRect(Rect(dst.X + inset, dst.Y + inset, dst.Width - inset * 2f, dst.Height - inset * 2f),
+            Radii(dst.Width * 0.15f), paint);
+    }
+
+    private static ImpellerColorFilter Sepia()
+    {
+        var matrix = new ImpellerColorMatrix();
+        ReadOnlySpan<float> v =
+        [
+            0.393f, 0.769f, 0.189f, 0, 0,
+            0.349f, 0.686f, 0.168f, 0, 0,
+            0.272f, 0.534f, 0.131f, 0, 0,
+            0, 0, 0, 1, 0,
+        ];
+        v.CopyTo(MemoryMarshal.CreateSpan(ref Unsafe.As<ImpellerColorMatrix, float>(ref matrix), 20));
+        return ImpellerColorFilter.CreateColorMatrixNew(matrix)!;
+    }
+
+    private ImpellerTexture GetTexture(ImpellerContext context)
+    {
+        if (_texture is not null && ReferenceEquals(_textureContext, context)) return _texture;
+
+        _texture?.Dispose();
+        var pixels = new byte[TextureSize * TextureSize * 4];
+        for (int y = 0; y < TextureSize; y++)
+        {
+            for (int x = 0; x < TextureSize; x++)
+            {
+                float u = x / (float)TextureSize, v = y / (float)TextureSize;
+                var c = Hsv(u * 0.8f + v * 0.2f, 0.55f, 0.35f + 0.5f * v);
+                float dx = u - 0.5f, dy = v - 0.5f, r = MathF.Sqrt(dx * dx + dy * dy);
+                if (r is > 0.18f and < 0.24f) c = Hsv(0.12f, 0.9f, 1f);
+                if (x % 32 == 0 || y % 32 == 0) c = new ImpellerColor { Red = 1, Green = 1, Blue = 1, Alpha = 1 };
+                if (((x / 8) + (y / 8)) % 2 == 0 && x > 176 && y > 176) c = new ImpellerColor { Alpha = 1 };
+
+                int i = (y * TextureSize + x) * 4;
+                pixels[i] = (byte)(c.Red * 255f);
+                pixels[i + 1] = (byte)(c.Green * 255f);
+                pixels[i + 2] = (byte)(c.Blue * 255f);
+                pixels[i + 3] = 255;
+            }
+        }
+
+        using var mem = new ImpellerUnmanagedMemory(pixels);
+        var descriptor = new ImpellerTextureDescriptor
+        {
+            Pixel_format = ImpellerPixelFormat.kImpellerPixelFormatRGBA8888,
+            Size = new ImpellerISize(TextureSize, TextureSize),
+            Mip_count = 1,
+        };
+        _texture = context.TextureCreateWithContentsNew(descriptor, mem)
+            ?? throw new InvalidOperationException("Could not create the texture.");
+        _textureContext = context;
+        return _texture;
+    }
+
+    public void Dispose()
+    {
+        _texture?.Dispose();
+        _tc.Dispose();
+    }
+}

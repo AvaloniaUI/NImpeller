@@ -12,5 +12,6 @@ public static class SceneCatalog
         new AnimatedGradientsScene(),
         new FragmentProgramScene(),
         new ShadowsScene(),
+        new ImageFiltersScene(),
     ];
 }

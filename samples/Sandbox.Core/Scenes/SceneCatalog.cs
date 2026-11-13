@@ -31,5 +31,6 @@ public static class SceneCatalog
         new ClipTestsScene(),
         new ArcsScene(),
         new SaveLayerTestsScene(),
+        new TransformsAndImagesScene(),
     ];
 }

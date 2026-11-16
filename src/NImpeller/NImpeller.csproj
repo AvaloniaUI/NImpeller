@@ -6,6 +6,9 @@
         <DisableRuntimeMarshalling>true</DisableRuntimeMarshalling>
         <IsTrimmable>true</IsTrimmable>
         <IsAotCompatible>true</IsAotCompatible>
+        <SignAssembly>true</SignAssembly>
+        <AssemblyOriginatorKeyFile>../../sign.snk</AssemblyOriginatorKeyFile>
+        <PublicSign>true</PublicSign>
     </PropertyGroup>
 
     <PropertyGroup>

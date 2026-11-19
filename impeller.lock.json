@@ -1,0 +1,134 @@
+{
+  "builder": "AvaloniaUI/impeller-builder",
+  "tag": "3.50.0-ab2912035e",
+  "repository": "AvaloniaUI/flutter",
+  "ref": "avalonia/3.50.0",
+  "sha": "ab2912035e160d9cad6306df307576da6128ebdb",
+  "version": "3.50.0",
+  "kind": "stable",
+  "patched": true,
+  "impellerVersion": "1.4.0",
+  "revision": 0,
+  "assets": {
+    "android-arm": {
+      "name": "impeller-3.50.0-ab2912035e-android-arm.tar.gz",
+      "size": 2609129,
+      "sha256": "15e6260c3fabed0cd88d20bb43edd4cf808d3ad2c087847e93b5582aa0635ebf",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-android-arm-symbols.tar.gz",
+        "size": 3828856,
+        "sha256": "8109d50eb7ad16749e8f8536c3e0a95937f9ff4d1c3644c5acb72de4a402cc6e"
+      }
+    },
+    "android-arm64": {
+      "name": "impeller-3.50.0-ab2912035e-android-arm64.tar.gz",
+      "size": 2933092,
+      "sha256": "aaa5f8151e6f4c81cbcdbe8d2ea339a4cb797f9a0127187c391c3545b3b50b18",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-android-arm64-symbols.tar.gz",
+        "size": 4067213,
+        "sha256": "262ff97c79279ac04fb9528e035b69d13ded457232ca7cc019d88879f94efc7d"
+      }
+    },
+    "android-x64": {
+      "name": "impeller-3.50.0-ab2912035e-android-x64.tar.gz",
+      "size": 2965076,
+      "sha256": "0fa181c93b2ca45e735bf50c973aed86c46514fb4ece0c609f7bb125a7de1587",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-android-x64-symbols.tar.gz",
+        "size": 3794003,
+        "sha256": "4e18253a9878d7afadc0654aec40741ae2e73cf4fa212c3ba039c94c05d38ad4"
+      }
+    },
+    "linux-arm64": {
+      "name": "impeller-3.50.0-ab2912035e-linux-arm64.tar.gz",
+      "size": 3777401,
+      "sha256": "9c432d24f789d62fe0632cbc803c21d2a0409e20f03398cc8f18398900f0ed33",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-linux-arm64-symbols.tar.gz",
+        "size": 5940770,
+        "sha256": "515ac0e5cb39e6243fa060fce9f34bd6a9d23751ece212829c0fa4d52b8fa03c"
+      },
+      "tools": {
+        "name": "impeller-3.50.0-ab2912035e-linux-arm64-tools.tar.gz",
+        "size": 3499068,
+        "sha256": "3442aa7a59fa121ecf1e53a2cb5c693389997cc86aa3962d814f1c6a640443d1"
+      }
+    },
+    "linux-x64": {
+      "name": "impeller-3.50.0-ab2912035e-linux-x64.tar.gz",
+      "size": 3944264,
+      "sha256": "25af67b29aa29ef73b10be03ad666e064435a6011f796d653a2b829f75822f21",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-linux-x64-symbols.tar.gz",
+        "size": 5835938,
+        "sha256": "c5e5dd7e376eac90898c61f8b5056584c58622f8129e21958a144992c1da95ca"
+      },
+      "tools": {
+        "name": "impeller-3.50.0-ab2912035e-linux-x64-tools.tar.gz",
+        "size": 3716634,
+        "sha256": "26c98f0c4eac1d0aafe44a1da39854b4fb825fcc7ec98f1fdde0addb21181a86"
+      }
+    },
+    "osx-arm64": {
+      "name": "impeller-3.50.0-ab2912035e-osx-arm64.tar.gz",
+      "size": 3503082,
+      "sha256": "64678779bfd1e4fb23cdbdec27acc93c4e550e38651d3db5e91b7ee3f7ef04dc",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-osx-arm64-symbols.tar.gz",
+        "size": 25726179,
+        "sha256": "2294ea2788387206d5041d9ad5071d2714f16d713163d468a25be347f8f83129"
+      },
+      "tools": {
+        "name": "impeller-3.50.0-ab2912035e-osx-arm64-tools.tar.gz",
+        "size": 3492745,
+        "sha256": "033d1e86278d3828db7022f96f01fac6589693be7b28d732da418de44b05ee57"
+      }
+    },
+    "osx-x64": {
+      "name": "impeller-3.50.0-ab2912035e-osx-x64.tar.gz",
+      "size": 3776781,
+      "sha256": "2f3be11b6069eca6af5ff67cb9ce360fa5f68859d8ba0fffc27677d5f94662f5",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-osx-x64-symbols.tar.gz",
+        "size": 25786564,
+        "sha256": "b56869f86756b3976d4663ca500c4b54d8d61ca0a6df298b2aee74803056e906"
+      },
+      "tools": {
+        "name": "impeller-3.50.0-ab2912035e-osx-x64-tools.tar.gz",
+        "size": 3723729,
+        "sha256": "6effc0b67b7641af181317b3cd15ab16c28464de45886c79e98267b33a07b6c0"
+      }
+    },
+    "win-arm64": {
+      "name": "impeller-3.50.0-ab2912035e-win-arm64.tar.gz",
+      "size": 2943085,
+      "sha256": "a6d6a74a2f919287835d6c9aa43addf39d6c141527ceefad978da40f091bf9e2",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-win-arm64-symbols.tar.gz",
+        "size": 20061290,
+        "sha256": "20f3c2fb00878bb0099d2f4c36fa29f9051d669728e3316a2dfda0cafd801524"
+      },
+      "tools": {
+        "name": "impeller-3.50.0-ab2912035e-win-arm64-tools.tar.gz",
+        "size": 2469463,
+        "sha256": "0ae05aa004c05627815815ce385dd590f1037b6ce164bbca53329432016964ea"
+      }
+    },
+    "win-x64": {
+      "name": "impeller-3.50.0-ab2912035e-win-x64.tar.gz",
+      "size": 3174272,
+      "sha256": "00b894de6de21649a146f677dd9eac359330b2001aa99d529cf4e8367c333178",
+      "symbols": {
+        "name": "impeller-3.50.0-ab2912035e-win-x64-symbols.tar.gz",
+        "size": 20556705,
+        "sha256": "8199396458aca27c3e38d4cc7edb11adb07556af0a8550c8fcf46aab650ac5fd"
+      },
+      "tools": {
+        "name": "impeller-3.50.0-ab2912035e-win-x64-tools.tar.gz",
+        "size": 2653851,
+        "sha256": "d7f691c5d9a3fff1071b8730491b7f360ee6743533e823147ced13d2587b27fc"
+      }
+    }
+  }
+}

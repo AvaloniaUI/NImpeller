@@ -51,7 +51,24 @@ public sealed record ImpellerLock(
         ("android-x64", "libimpeller.so"),
     };
 
-    public static bool IsDesktop(string rid) => !rid.StartsWith("android-", StringComparison.Ordinal);
+    // The Apple mobile platforms: one archive each, with impeller.framework per framework directory (a .NET RID root).
+    // The Mac Catalyst framework is versioned (symbolic links), so NuGet gets impeller.framework.zip.
+    public static readonly (string Platform, string[] FrameworkDirs, string Description)[] ApplePlatforms =
+    {
+        ("ios", new[] { "ios", "iossimulator" }, "iOS 15.0 or newer, devices (arm64) and simulators (arm64, x64)"),
+        ("tvos", new[] { "tvos", "tvossimulator" }, "tvOS 16.0 or newer, devices (arm64) and simulators (arm64, x64)"),
+        ("maccatalyst", new[] { "maccatalyst" }, "Mac Catalyst 15.0 or newer, arm64 and x64"),
+    };
+
+    /// <summary>Every target of a release: the RIDs, then the Apple mobile platforms.</summary>
+    public static IEnumerable<string> Targets => Rids.Select(r => r.Rid).Concat(ApplePlatforms.Select(p => p.Platform));
+
+    public static bool IsKnownTarget(string target) => Targets.Contains(target);
+
+    /// <summary>The RIDs with impellerc (tools archives).</summary>
+    public static bool IsDesktop(string rid) =>
+        rid.StartsWith("linux-", StringComparison.Ordinal) || rid.StartsWith("osx-", StringComparison.Ordinal)
+        || rid.StartsWith("win-", StringComparison.Ordinal);
 
     public static string LibraryOf(string rid) => Rids.First(r => r.Rid == rid).Library;
 
@@ -167,12 +184,14 @@ public sealed record ImpellerLock(
         File.WriteAllText(PathIn(root), node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + "\n");
     }
 
-    /// <summary>Fails unless every shipped RID has a library and symbols archive, and every desktop RID tools.</summary>
+    /// <summary>
+    /// Fails unless every shipped target (RID or Apple platform) has a library and symbols archive, and every
+    /// desktop RID tools.
+    /// </summary>
     public void RequireComplete()
     {
-        var missing = Rids
-            .Where(r => !Assets.TryGetValue(r.Rid, out var a) || a.Symbols == null || (IsDesktop(r.Rid) && a.Tools == null))
-            .Select(r => r.Rid)
+        var missing = Targets
+            .Where(t => !Assets.TryGetValue(t, out var a) || a.Symbols == null || (IsDesktop(t) && a.Tools == null))
             .ToArray();
         if (missing.Length > 0)
             throw new Exception($"Release {Tag} lacks archives for {string.Join(", ", missing)}");
@@ -372,6 +391,16 @@ public sealed class ImpellerFetcher
                 case TarEntryType.RegularFile or TarEntryType.V7RegularFile:
                     Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
                     entry.ExtractToFile(destination, overwrite: true);
+                    break;
+                case TarEntryType.SymbolicLink:
+                    // The versioned Mac Catalyst framework. Windows hosts skip it: they use its zip.
+                    if (OperatingSystem.IsWindows())
+                        break;
+                    var linkTarget = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(destination)!, entry.LinkName));
+                    if (Path.IsPathRooted(entry.LinkName) || !linkTarget.StartsWith(full, StringComparison.Ordinal))
+                        throw new Exception($"{archive}: link {entry.Name} -> {entry.LinkName} leaves the archive root");
+                    Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                    File.CreateSymbolicLink(destination, entry.LinkName);
                     break;
                 default:
                     throw new Exception($"{archive}: unsupported entry {entry.Name} ({entry.EntryType})");

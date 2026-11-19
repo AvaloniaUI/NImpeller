@@ -107,7 +107,7 @@
       "properties": {
         "All": {
           "type": "boolean",
-          "description": "All RIDs of the lock file"
+          "description": "All RIDs and Apple platforms of the lock file"
         },
         "Builder": {
           "type": "string",
@@ -127,7 +127,7 @@
         },
         "Rid": {
           "type": "string",
-          "description": "RID of the Impeller SDK (linux-x64, osx-arm64, win-x64, android-arm64, ...) - Default is the host"
+          "description": "RID of the Impeller SDK (linux-x64, osx-arm64, win-x64, android-arm64, ...) or Apple platform (ios, tvos, maccatalyst) - Default is the host"
         },
         "Symbols": {
           "type": "boolean",

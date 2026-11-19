@@ -52,8 +52,8 @@ partial class Build
             staging.CreateOrCleanDirectory();
             var sdk = staging / "sdk";
 
-            foreach (var (rid, _) in ImpellerLock.Rids)
-                await fetcher.EnsureAsync(sdk, rid, ImpellerParts.Main | ImpellerParts.Symbols);
+            foreach (var target in ImpellerLock.Targets)
+                await fetcher.EnsureAsync(sdk, target, ImpellerParts.Main | ImpellerParts.Symbols);
 
             var header = VerifyHeadersIdentical(sdk);
 
@@ -117,8 +117,8 @@ partial class Build
 
     static AbsolutePath VerifyHeadersIdentical(AbsolutePath sdk)
     {
-        var headers = ImpellerLock.Rids
-            .Select(p => (p.Rid, Path: sdk / p.Rid / "include" / "impeller.h"))
+        var headers = ImpellerLock.Targets
+            .Select(t => (Rid: t, Path: sdk / t / "include" / "impeller.h"))
             .ToArray();
 
         // Compare content, not bytes, in case an archive carries CRLF line endings.
@@ -132,7 +132,7 @@ partial class Build
         if (different.Length > 0)
             throw new Exception($"impeller.h differs between {headers[0].Rid} and {string.Join(", ", different)}; bindings cannot be shared");
 
-        Log.Information("impeller.h is identical across all {Count} RIDs", headers.Length);
+        Log.Information("impeller.h is identical across all {Count} RIDs and Apple platforms", headers.Length);
         return headers[0].Path;
     }
 
@@ -272,18 +272,22 @@ partial class Build
             }
         }
 
-        // Meta package: depends on every RID package.
+        foreach (var (platform, frameworkDirs, platformDescription) in ImpellerLock.ApplePlatforms)
+            packages.AddRange(CreateApplePackages(pin, staging, sdk, notices, version, exact, nimpellerCommit, origin,
+                platform, frameworkDirs, platformDescription));
+
+        // Meta package: depends on every RID and Apple platform package.
         {
             var builder = NewBuilder(NativeMetaPackageId, version, nimpellerCommit, "MIT",
-                $"Pulls in the Impeller native libraries for every supported RID. {origin}");
+                $"Pulls in the Impeller native libraries for every supported RID and Apple platform. {origin}");
             builder.Tags.Add("native");
             builder.DependencyGroups.Add(new PackageDependencyGroup(NuGetFramework.AnyFramework,
-                ImpellerLock.Rids.Select(p => new PackageDependency($"{NativeMetaPackageId}.{p.Rid}", exact))));
+                ImpellerLock.Targets.Select(t => new PackageDependency($"{NativeMetaPackageId}.{t}", exact))));
             AddReadme(builder, staging, NativeMetaPackageId, $"""
                 # {NativeMetaPackageId}
 
-                Meta package that references the Impeller native library for every supported RID:
-                {string.Join(", ", ImpellerLock.Rids.Select(p => $"`{p.Rid}`"))}.
+                Meta package that references the Impeller native library for every supported RID and Apple platform:
+                {string.Join(", ", ImpellerLock.Targets.Select(t => $"`{t}`"))}.
 
                 {OriginTable(pin)}
                 """);
@@ -299,6 +303,94 @@ partial class Build
                 new[] { new PackageDependency(NativeMetaPackageId, exact) }));
             AddReadme(builder, staging, ManagedPackageId, $"""
                 # NImpeller
+
+                {OriginTable(pin)}
+                """);
+            packages.Add(Save(builder));
+        }
+
+        return packages;
+    }
+
+    /// <summary>
+    /// NImpeller.Native.&lt;platform&gt; with impeller.framework per framework directory, as the .NET Apple SDK takes
+    /// them from runtimes/&lt;RID root&gt;/native (the Mac Catalyst framework zipped, since NuGet cannot hold its
+    /// symbolic links), and its .Symbols package with the dSYMs under symbols/, which the app build does not copy.
+    /// </summary>
+    List<string> CreateApplePackages(ImpellerLock pin, AbsolutePath staging, AbsolutePath sdk, AbsolutePath notices,
+        NuGetVersion version, VersionRange exact, string nimpellerCommit, string origin, string platform,
+        string[] frameworkDirs, string platformDescription)
+    {
+        var packages = new List<string>();
+        var id = $"{NativeMetaPackageId}.{platform}";
+        var toolchain = DescribeToolchain(sdk / platform / "build-info.json");
+        var frameworks = sdk / platform / "frameworks";
+        var x64Note = platform == "maccatalyst"
+            ? " The x64 slice is built and checked, and has run under Rosetta on Apple silicon, not on an Intel Mac."
+            : "";
+
+        {
+            var builder = NewBuilder(id, version, nimpellerCommit, "BSD-3-Clause",
+                $"Impeller native library (impeller.framework) for {platformDescription}, used by NImpeller. {origin}");
+            builder.Tags.AddRange(new[] { "native", platform });
+            foreach (var dir in frameworkDirs)
+            {
+                if (platform == "maccatalyst")
+                {
+                    AddFile(builder, frameworks / dir / "impeller.framework.zip", $"runtimes/{dir}/native/impeller.framework.zip");
+                    continue;
+                }
+                var framework = frameworks / dir / "impeller.framework";
+                if (!framework.DirectoryExists())
+                    throw new Exception($"{framework} not found");
+                foreach (var file in Directory.GetFiles(framework, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+                    AddFile(builder, file, $"runtimes/{dir}/native/impeller.framework/{Path.GetRelativePath(framework, file).Replace('\\', '/')}");
+            }
+            if (platform == "ios")
+            {
+                // NuGet's RID graph falls back from maccatalyst-* to ios-*: without an asset of its own, a Mac
+                // Catalyst app would take the iOS device framework from this package.
+                var placeholder = staging / "placeholder" / "_._";
+                placeholder.Parent.CreateDirectory();
+                File.WriteAllText(placeholder, "");
+                AddFile(builder, placeholder, "runtimes/maccatalyst/native/_._");
+            }
+            AddFile(builder, notices, "THIRD-PARTY-NOTICES.txt");
+            AddReadme(builder, staging, id, $"""
+                # {id}
+
+                The Impeller native library as `impeller.framework` for {platformDescription}, built by
+                {BuilderLink(pin)} without debug information. The .NET Apple SDK embeds the framework that matches
+                the app's RuntimeIdentifier ({string.Join(", ", frameworkDirs.Select(d => $"`{d}`"))}), and NImpeller
+                loads it from `@rpath/impeller.framework/impeller`. The symbols are in `{id}.Symbols`.{x64Note}
+
+                {OriginTable(pin)}
+
+                Toolchain: {toolchain}
+
+                The binary is licensed under Flutter's BSD-3-Clause license and the licenses of its
+                bundled dependencies; see `THIRD-PARTY-NOTICES.txt`.
+                """);
+            packages.Add(Save(builder));
+        }
+
+        {
+            var symbolsId = id + ".Symbols";
+            var builder = NewBuilder(symbolsId, version, nimpellerCommit, "BSD-3-Clause",
+                $"Debug symbols (dSYM) of the Impeller native library for {platformDescription}. {origin}");
+            builder.Tags.AddRange(new[] { "native", "symbols", platform });
+            var symbols = sdk / platform / "symbols" / "frameworks";
+            foreach (var file in Directory.GetFiles(symbols, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+                AddFile(builder, file, $"symbols/{Path.GetRelativePath(symbols, file).Replace('\\', '/')}");
+            AddFile(builder, notices, "THIRD-PARTY-NOTICES.txt");
+            builder.DependencyGroups.Add(new PackageDependencyGroup(NuGetFramework.AnyFramework,
+                new[] { new PackageDependency(id, exact) }));
+            AddReadme(builder, staging, symbolsId, $"""
+                # {symbolsId}
+
+                Debug symbols of `impeller.framework` in `{id}`: `symbols/<RID root>/impeller.framework.dSYM`
+                for {string.Join(", ", frameworkDirs.Select(d => $"`{d}`"))}. They are not copied into apps; crash
+                reporting tools and `atos` find a dSYM by the UUID of the framework binary.
 
                 {OriginTable(pin)}
                 """);

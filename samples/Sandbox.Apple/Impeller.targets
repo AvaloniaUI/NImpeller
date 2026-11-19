@@ -1,0 +1,27 @@
+<Project>
+  <!--
+    Embeds impeller.framework for the target platform from external/impeller_sdk/<platform>/frameworks/<dir>, where
+    <dir> is the RID root: ios or iossimulator, tvos or tvossimulator, maccatalyst. The NImpeller.Native.<platform>
+    packages carry the same frameworks under runtimes/<dir>/native.
+  -->
+  <PropertyGroup>
+    <ImpellerSdkDirectory>$([MSBuild]::NormalizeDirectory('$(MSBuildThisFileDirectory)', '..', '..', 'external', 'impeller_sdk'))</ImpellerSdkDirectory>
+  </PropertyGroup>
+
+  <!-- In a target: RuntimeIdentifier (device or simulator) is set by the SDK after the project is evaluated. -->
+  <Target Name="_AddImpellerFramework" BeforeTargets="BeforeBuild" Condition="'$(TargetFramework)' != ''">
+    <PropertyGroup>
+      <_ImpellerPlatform Condition="$(TargetFramework.Contains('-ios'))">ios</_ImpellerPlatform>
+      <_ImpellerPlatform Condition="$(TargetFramework.Contains('-tvos'))">tvos</_ImpellerPlatform>
+      <_ImpellerPlatform Condition="$(TargetFramework.Contains('-maccatalyst'))">maccatalyst</_ImpellerPlatform>
+      <_ImpellerFrameworkDir>$(_ImpellerPlatform)</_ImpellerFrameworkDir>
+      <_ImpellerFrameworkDir Condition="$(RuntimeIdentifier.Contains('simulator'))">$(_ImpellerPlatform)simulator</_ImpellerFrameworkDir>
+      <_ImpellerFramework>$(ImpellerSdkDirectory)$(_ImpellerPlatform)/frameworks/$(_ImpellerFrameworkDir)/impeller.framework</_ImpellerFramework>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(_ImpellerFramework)')"
+           Text="impeller.framework not found at $(_ImpellerFramework). Run: ./build.sh DownloadImpeller --rid $(_ImpellerPlatform)" />
+    <ItemGroup>
+      <NativeReference Include="$(_ImpellerFramework)" Kind="Framework" />
+    </ItemGroup>
+  </Target>
+</Project>

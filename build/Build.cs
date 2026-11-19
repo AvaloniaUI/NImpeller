@@ -14,7 +14,7 @@ using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
 // The natives come from the AvaloniaUI/impeller-builder release pinned in impeller.lock.json:
 //
-//   ./build.sh DownloadImpeller [--rid <rid>|--all] [--symbols] [--tools] [--builder-dir <path>]
+//   ./build.sh DownloadImpeller [--rid <rid>|ios|tvos|maccatalyst|--all] [--symbols] [--tools] [--builder-dir <path>]
 //   ./build.sh GenerateBindings [--rid <rid>]
 //   ./build.sh BumpImpeller --tag <version>-<sha10>
 //   ./build.sh CompileShaders
@@ -25,10 +25,10 @@ partial class Build : NukeBuild
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
     readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
 
-    [Parameter("RID of the Impeller SDK (linux-x64, osx-arm64, win-x64, android-arm64, ...) - Default is the host")]
+    [Parameter("RID of the Impeller SDK (linux-x64, osx-arm64, win-x64, android-arm64, ...) or Apple platform (ios, tvos, maccatalyst) - Default is the host")]
     readonly string Rid;
 
-    [Parameter("All RIDs of the lock file")]
+    [Parameter("All RIDs and Apple platforms of the lock file")]
     readonly bool All;
 
     [Parameter("Also unpack the debug symbols archive")]
@@ -67,7 +67,7 @@ partial class Build : NukeBuild
         });
 
     Target DownloadImpeller => _ => _
-        .Description("Download, verify and unpack the pinned Impeller SDK into external/impeller_sdk/<rid>/")
+        .Description("Download, verify and unpack the pinned Impeller SDK into external/impeller_sdk/<rid or platform>/")
         .Executes(async () =>
         {
             var fetcher = ImpellerFetcher.Create(RootDirectory, BuilderDir);
@@ -114,7 +114,7 @@ partial class Build : NukeBuild
             pinned = pinned with
             {
                 Assets = pinned.Assets
-                    .Where(a => ImpellerLock.Rids.Any(r => r.Rid == a.Key))
+                    .Where(a => ImpellerLock.IsKnownTarget(a.Key))
                     .ToDictionary(a => a.Key, a => a.Value),
             };
             pinned.Write(RootDirectory);

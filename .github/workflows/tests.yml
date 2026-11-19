@@ -47,11 +47,13 @@ jobs:
           sudo ldconfig
 
       # Bindings (src/NImpeller/Generated/Bindings.g.cs) and the native libimpeller.so are not
-      # committed; download the Linux SDK at the latest Flutter engine commit and generate them.
+      # committed; download the linux-x64 SDK pinned in impeller.lock.json and generate them.
       - name: Download Impeller SDK (linux-x64) and generate bindings
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           chmod +x ./build.sh
-          ./build.sh GenerateBindings --platform linux-x64
+          ./build.sh GenerateBindings --rid linux-x64
 
       # Prints what GL/EGL stack the runner actually exposes (helps diagnose context failures).
       - name: GL diagnostics

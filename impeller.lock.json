@@ -8,7 +8,7 @@
   "kind": "stable",
   "patched": true,
   "impellerVersion": "1.4.0",
-  "revision": 0,
+  "revision": 2,
   "assets": {
     "android-arm": {
       "name": "impeller-3.50.0-ab2912035e-android-arm.tar.gz",

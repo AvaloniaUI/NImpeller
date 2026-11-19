@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using NuGet.Frameworks;
@@ -14,105 +15,45 @@ using NuGet.Packaging.Licenses;
 using NuGet.Versioning;
 using Nuke.Common;
 using Nuke.Common.IO;
-using Nuke.Common.Tooling;
 using Nuke.Common.Tools.DotNet;
 using Serilog;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
-// NuGet packaging of NImpeller for a given Flutter release tag or framework commit.
+// NuGet packaging of NImpeller for the impeller-builder release pinned in impeller.lock.json.
 //
-//   ./build.sh Pack --flutter-ref 3.47.9
-//   ./build.sh Pack --flutter-ref 3.50.0-0.4.pre
-//   ./build.sh Pack --flutter-ref a55d35a8b73          # master commit -> X.Y.0-dev.<date>.<sha>
+//   ./build.sh Pack
+//   ./build.sh Pack --builder-dir ../impeller-builder/release    # unpublished local builds
 //
-// The Flutter checkout is only read (plus `git fetch <remote> --tags`). Everything for a pack is
-// staged under artifacts/staging/<version>/, so external/impeller_sdk and Generated/Bindings.g.cs
-// are left alone. Packages land in artifacts/packages/.
+// Everything for a pack is staged under artifacts/staging/<version>/, so external/impeller_sdk and
+// Generated/Bindings.g.cs are left alone. Packages land in artifacts/packages/.
 partial class Build
 {
-    [Parameter("Flutter tag or commit to package (default: latest stable tag)")]
-    readonly string FlutterRef;
-
-    [Parameter("Path to a flutter/flutter checkout (default: ../flutter)")]
-    readonly AbsolutePath FlutterRoot;
-
-    [Parameter("Git remote of the Flutter checkout to fetch tags from (default: upstream)")]
-    readonly string FlutterRemote = "upstream";
-
-    [Parameter("Binding revision on top of the same Flutter release (stable: 4th version part, beta: last prerelease part)")]
-    readonly int Revision;
-
-    [Parameter("Do not fetch tags from the Flutter remote")]
-    readonly bool NoFetch;
-
-    [Parameter("Path to llvm-strip, used to strip the Android libraries (default: from the Android NDK, then PATH)")]
-    readonly AbsolutePath LlvmStrip;
-
     const string RepositoryUrl = "https://github.com/AvaloniaUI/NImpeller";
     const string PackageAuthors = "AvaloniaUI OÜ";
     const string PackageCopyright = "Copyright (c) AvaloniaUI OÜ All Rights Reserved";
     const string ManagedPackageId = "NImpeller";
     const string NativeMetaPackageId = "NImpeller.Native";
 
-    // Strip: the library ships with debug info and is stripped before packing. Flutter's Android
-    // libimpeller.so is ~225 MB unstripped. android-x86 is left out: .NET for Android barely
-    // supports it and Flutter does not publish it for every engine commit.
-    static readonly (string Platform, string Rid, string Library, bool Strip)[] PackagePlatforms =
-    {
-        ("linux-x64", "linux-x64", "libimpeller.so", false),
-        ("linux-arm64", "linux-arm64", "libimpeller.so", false),
-        ("darwin-x64", "osx-x64", "libimpeller.dylib", false),
-        ("darwin-arm64", "osx-arm64", "libimpeller.dylib", false),
-        ("windows-x64", "win-x64", "impeller.dll", false),
-        ("windows-arm64", "win-arm64", "impeller.dll", false),
-        ("android-arm64", "android-arm64", "libimpeller.so", true),
-        ("android-arm", "android-arm", "libimpeller.so", true),
-        ("android-x64", "android-x64", "libimpeller.so", true),
-    };
-
-    static readonly Regex StableTag = new(@"^(\d+)\.(\d+)\.(\d+)$");
-    static readonly Regex BetaTag = new(@"^(\d+)\.(\d+)\.0-(\d+)\.(\d+)\.pre$");
-    static readonly Regex CandidateBranch = new(@"^flutter-(\d+)\.(\d+)-candidate\.(\d+)$");
-
     AbsolutePath ArtifactsDirectory => RootDirectory / "artifacts";
     AbsolutePath PackagesDirectory => ArtifactsDirectory / "packages";
 
-    record FlutterRelease(
-        string Ref,
-        string Commit,
-        string Kind,            // stable | beta | dev
-        string FlutterVersion,  // tag name, or null for an untagged commit
-        string EngineHash,
-        string PackageVersion);
-
-    Target ResolveFlutterVersion => _ => _
-        .Description("Show the Flutter commit, engine hash and package version that Pack would use")
-        .Executes(() => LogRelease(ResolveFlutterRelease()));
-
     Target Pack => _ => _
-        .Description("Build NImpeller NuGet packages for a Flutter tag or commit (--flutter-ref)")
+        .Description("Build the NImpeller NuGet packages from the pinned Impeller SDK (or --builder-dir)")
         .Executes(async () =>
         {
-            var release = ResolveFlutterRelease();
-            LogRelease(release);
+            var fetcher = ImpellerFetcher.Create(RootDirectory, BuilderDir);
+            var pin = fetcher.Lock;
+            if (BuilderDir == null)
+                pin.RequireComplete();
+            LogPin(pin);
             WarnIfWorkingTreeDirty();
 
-            // Find the strip tool before downloading several hundred MB of SDKs.
-            var llvmStrip = PackagePlatforms.Any(p => p.Strip) ? FindLlvmStrip() : null;
-
-            var staging = ArtifactsDirectory / "staging" / release.PackageVersion;
+            var staging = ArtifactsDirectory / "staging" / pin.PackageVersion;
             staging.CreateOrCleanDirectory();
             var sdk = staging / "sdk";
 
-            await Task.WhenAll(PackagePlatforms.Select(p => DownloadPlatformAsync(release.EngineHash, p.Platform, sdk)));
-            foreach (var p in PackagePlatforms)
-            {
-                var lib = sdk / p.Platform / "lib" / p.Library;
-                if (!File.Exists(lib))
-                    throw new Exception($"Expected native library missing from the {p.Platform} SDK: {lib}");
-                if (p.Strip)
-                    StripNativeLibrary(llvmStrip, p.Platform, lib);
-            }
+            foreach (var (rid, _) in ImpellerLock.Rids)
+                await fetcher.EnsureAsync(sdk, rid, ImpellerParts.Main | ImpellerParts.Symbols);
 
             var header = VerifyHeadersIdentical(sdk);
 
@@ -122,11 +63,11 @@ partial class Build
             VerifyHostNativeVersion(sdk, bindings);
 
             var build = staging / "build";
-            var managedDll = BuildManaged(release, bindings, build);
+            var managedDll = BuildManaged(pin, bindings, build);
             RunUnitTests(sdk, bindings, build);
 
             PackagesDirectory.CreateDirectory();
-            var packages = CreatePackages(release, staging, sdk, managedDll);
+            var packages = CreatePackages(pin, staging, sdk, managedDll);
 
             Log.Information("");
             Log.Information("Packages written to {Directory}:", PackagesDirectory);
@@ -134,158 +75,24 @@ partial class Build
                 Log.Information("  {Package}", Path.GetFileName(package));
         });
 
-    // ---------------------------------------------------------------------------------------
-    // Flutter ref -> commit, engine hash, package version
-    // ---------------------------------------------------------------------------------------
-
-    AbsolutePath FlutterCheckout
+    static void LogPin(ImpellerLock pin)
     {
-        get
-        {
-            var root = FlutterRoot ?? RootDirectory.Parent / "flutter";
-            if (!Directory.Exists(root / ".git") && !File.Exists(root / ".git"))
-                throw new Exception($"No Flutter git checkout at {root}; pass --flutter-root");
-            return root;
-        }
+        Log.Information("impeller-builder: {Builder} {Tag}", pin.Builder, pin.Tag);
+        Log.Information("Flutter:          {Version} ({Kind}{Patched})", pin.Version, pin.Kind, pin.Patched ? ", patched" : "");
+        Log.Information("Source:           {Repository} {Ref} @ {Sha}", pin.Repository, pin.Ref, pin.Sha);
+        Log.Information("Package version:  {Version}", pin.PackageVersion);
     }
-
-    FlutterRelease ResolveFlutterRelease()
-    {
-        var root = FlutterCheckout;
-
-        if (!NoFetch)
-        {
-            Log.Information("Fetching tags from {Remote} in {Root}...", FlutterRemote, root);
-            if (RunGit(root, $"fetch {FlutterRemote} --tags --quiet", throwOnError: false) == null)
-                Log.Warning("git fetch {Remote} failed; continuing with the tags already in the clone", FlutterRemote);
-        }
-
-        var refName = FlutterRef ?? LatestStableTag(root);
-        var commit = RunGit(root, $"rev-parse --verify --quiet {refName}^{{commit}}", throwOnError: false)?.Trim();
-        if (string.IsNullOrEmpty(commit))
-            throw new Exception($"Unknown Flutter ref '{refName}' in {root}");
-
-        // A ref that is (or points at) a release tag is packaged as that release.
-        var tag = IsReleaseTag(refName)
-            ? refName
-            : RunGit(root, $"tag --points-at {commit}")
-                .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Where(IsReleaseTag)
-                .OrderBy(t => StableTag.IsMatch(t) ? 0 : 1)
-                .FirstOrDefault();
-
-        var engineVersionFile = GitShow(root, commit, "bin/internal/engine.version")?.Trim();
-        var engineHash = string.IsNullOrEmpty(engineVersionFile) ? ContentAwareHash(root, commit) : engineVersionFile;
-
-        if (tag != null)
-        {
-            if (string.IsNullOrEmpty(engineVersionFile))
-                Log.Warning("Tag {Tag} has no bin/internal/engine.version; using the content-aware hash", tag);
-
-            var stable = StableTag.Match(tag);
-            if (stable.Success)
-            {
-                var version = Revision > 0 ? $"{tag}.{Revision}" : tag;
-                return new FlutterRelease(refName, commit, "stable", tag, engineHash, version);
-            }
-
-            var beta = BetaTag.Match(tag);
-            var betaVersion = $"{beta.Groups[1]}.{beta.Groups[2]}.0-pre.{beta.Groups[3]}.{beta.Groups[4]}.{Revision}";
-            return new FlutterRelease(refName, commit, "beta", tag, engineHash, betaVersion);
-        }
-
-        if (Revision > 0)
-            Log.Warning("--revision is ignored for untagged commits; dev versions are unique per commit");
-
-        var (major, minor) = DevBaseVersion(root, commit);
-        var date = DateTimeOffset.FromUnixTimeSeconds(long.Parse(RunGit(root, $"show -s --format=%ct {commit}").Trim()))
-            .UtcDateTime.ToString("yyyyMMdd");
-        var shortSha = commit[..7];
-        // SemVer forbids leading zeros in numeric identifiers, so never let the sha be all digits.
-        if (shortSha.All(char.IsAsciiDigit))
-            shortSha = "g" + shortSha;
-
-        return new FlutterRelease(refName, commit, "dev", null, engineHash,
-            $"{major}.{minor}.0-dev.{date}.{shortSha}");
-    }
-
-    static bool IsReleaseTag(string name) => StableTag.IsMatch(name) || BetaTag.IsMatch(name);
-
-    static string LatestStableTag(AbsolutePath root)
-    {
-        var tag = RunGit(root, "tag --list")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(t => StableTag.IsMatch(t))
-            .OrderByDescending(Version.Parse)
-            .FirstOrDefault();
-        return tag ?? throw new Exception($"No stable release tags in {root}; fetch them or pass --flutter-ref");
-    }
-
-    // Base X.Y for an untagged commit. On a release branch it is the branch's version; on master it
-    // is the minor after the newest release branch cut that the commit already contains.
-    static (int Major, int Minor) DevBaseVersion(AbsolutePath root, string commit)
-    {
-        var candidate = GitShow(root, commit, "bin/internal/release-candidate-branch.version")?.Trim();
-        var candidateMatch = candidate != null ? CandidateBranch.Match(candidate) : Match.Empty;
-        if (candidateMatch.Success)
-            return (int.Parse(candidateMatch.Groups[1].Value), int.Parse(candidateMatch.Groups[2].Value));
-
-        var tagsByMinor = RunGit(root, "tag --list")
-            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Select(t => (Tag: t, Match: StableTag.IsMatch(t) ? StableTag.Match(t) : BetaTag.Match(t)))
-            .Where(x => x.Match.Success)
-            .GroupBy(x => (Major: int.Parse(x.Match.Groups[1].Value), Minor: int.Parse(x.Match.Groups[2].Value)))
-            .OrderByDescending(g => g.Key.Major).ThenByDescending(g => g.Key.Minor)
-            .Take(12);
-
-        foreach (var group in tagsByMinor)
-        {
-            // The commit that created release-candidate-branch.version initialises the branch; its
-            // parent is the master commit the branch was cut from.
-            var init = RunGit(root,
-                $"log -1 --diff-filter=A --format=%H {group.First().Tag} -- bin/internal/release-candidate-branch.version").Trim();
-            if (string.IsNullOrEmpty(init))
-                break;
-
-            if (RunGit(root, $"merge-base --is-ancestor {init}^ {commit}", throwOnError: false) != null)
-                return (group.Key.Major, group.Key.Minor + 1);
-        }
-
-        throw new Exception($"Could not determine a Flutter version for {commit}: it predates the release branches known to this clone. Pass a release tag instead.");
-    }
-
-    // Mirrors bin/internal/content_aware_hash.sh: git ls-tree <ref> -- <tracked> | git hash-object --stdin
-    static string ContentAwareHash(AbsolutePath root, string commit)
-    {
-        var tree = RunGit(root, $"ls-tree {commit} -- DEPS engine bin/internal/release-candidate-branch.version");
-        return RunGit(root, "hash-object --stdin", stdin: tree).Trim();
-    }
-
-    static string GitShow(AbsolutePath root, string commit, string path) =>
-        RunGit(root, $"show {commit}:{path}", throwOnError: false);
 
     // Returns stdout, or null on a non-zero exit when throwOnError is false.
-    static string RunGit(AbsolutePath root, string arguments, bool throwOnError = true, string stdin = null)
+    static string RunGit(AbsolutePath root, string arguments, bool throwOnError = true)
     {
-        // Same as content_aware_hash.sh: Apple Git can misbehave with multi-pack indexes.
-        var psi = new ProcessStartInfo("git", $"-c core.multiPackIndex=false -C \"{root}\" {arguments}")
+        var psi = new ProcessStartInfo("git", $"-C \"{root}\" {arguments}")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
-            RedirectStandardInput = stdin != null,
             UseShellExecute = false,
         };
-        psi.Environment.Remove("GIT_DIR");
-        psi.Environment.Remove("GIT_INDEX_FILE");
-        psi.Environment.Remove("GIT_WORK_TREE");
-
         using var process = Process.Start(psi)!;
-        if (stdin != null)
-        {
-            process.StandardInput.Write(stdin);
-            process.StandardInput.Close();
-        }
-
         var stderrTask = process.StandardError.ReadToEndAsync();
         var stdout = process.StandardOutput.ReadToEnd();
         process.WaitForExit();
@@ -297,15 +104,6 @@ partial class Build
         throw new Exception($"git {arguments} failed ({process.ExitCode}): {stderrTask.Result.Trim()}");
     }
 
-    static void LogRelease(FlutterRelease release)
-    {
-        Log.Information("Flutter ref:      {Ref}", release.Ref);
-        Log.Information("Flutter commit:   {Commit}", release.Commit);
-        Log.Information("Flutter version:  {Version} ({Kind})", release.FlutterVersion ?? "untagged", release.Kind);
-        Log.Information("Engine hash:      {Engine}", release.EngineHash);
-        Log.Information("Package version:  {Version}", release.PackageVersion);
-    }
-
     void WarnIfWorkingTreeDirty()
     {
         var status = RunGit(RootDirectory, "status --porcelain --untracked-files=no", throwOnError: false);
@@ -314,92 +112,27 @@ partial class Build
     }
 
     // ---------------------------------------------------------------------------------------
-    // Native library stripping
-    // ---------------------------------------------------------------------------------------
-
-    string FindLlvmStrip()
-    {
-        if (LlvmStrip != null)
-        {
-            if (!File.Exists(LlvmStrip))
-                throw new Exception($"--llvm-strip {LlvmStrip} does not exist");
-            return LlvmStrip;
-        }
-
-        var exe = OperatingSystem.IsWindows() ? "llvm-strip.exe" : "llvm-strip";
-        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-
-        // NDK roots: explicit NDK variables first, then the newest NDK of an Android SDK.
-        var ndkRoots = new[] { "ANDROID_NDK_HOME", "ANDROID_NDK_ROOT", "ANDROID_NDK" }
-            .Select(Environment.GetEnvironmentVariable)
-            .Where(d => !string.IsNullOrEmpty(d))
-            .ToList();
-        var sdkRoots = new[]
-            {
-                Environment.GetEnvironmentVariable("ANDROID_HOME"),
-                Environment.GetEnvironmentVariable("ANDROID_SDK_ROOT"),
-                Path.Combine(home, "Library", "Android", "sdk"),
-                Path.Combine(home, "Android", "Sdk"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Android", "Sdk"),
-            }
-            .Where(d => !string.IsNullOrEmpty(d) && Directory.Exists(Path.Combine(d, "ndk")));
-        foreach (var sdk in sdkRoots)
-            ndkRoots.AddRange(Directory.GetDirectories(Path.Combine(sdk, "ndk"))
-                .OrderByDescending(d => Version.TryParse(Path.GetFileName(d), out var v) ? v : new Version()));
-
-        foreach (var ndk in ndkRoots)
-        {
-            var prebuilt = Path.Combine(ndk, "toolchains", "llvm", "prebuilt");
-            if (!Directory.Exists(prebuilt))
-                continue;
-            var tool = Directory.GetDirectories(prebuilt)
-                .Select(d => Path.Combine(d, "bin", exe))
-                .FirstOrDefault(File.Exists);
-            if (tool != null)
-                return tool;
-        }
-
-        var onPath = (Environment.GetEnvironmentVariable("PATH") ?? "")
-            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
-            .Select(d => Path.Combine(d, exe))
-            .FirstOrDefault(File.Exists);
-        return onPath ?? throw new Exception(
-            "llvm-strip not found. Install the Android NDK, set ANDROID_NDK_HOME, or pass --llvm-strip <path>");
-    }
-
-    static void StripNativeLibrary(string llvmStrip, string platform, AbsolutePath library)
-    {
-        var before = new FileInfo(library).Length;
-        // Same as the Android Gradle plugin: drop debug info and the static symbol table, keep .dynsym.
-        ProcessTasks.StartProcess(llvmStrip, $"--strip-unneeded \"{library}\"", logOutput: false)
-            .AssertZeroExitCode();
-        var after = new FileInfo(library).Length;
-        Log.Information("Stripped {Platform} {Library}: {Before:N1} MB -> {After:N1} MB",
-            platform, library.Name, before / 1048576.0, after / 1048576.0);
-    }
-
-    // ---------------------------------------------------------------------------------------
     // Verification
     // ---------------------------------------------------------------------------------------
 
     static AbsolutePath VerifyHeadersIdentical(AbsolutePath sdk)
     {
-        var headers = PackagePlatforms
-            .Select(p => (p.Platform, Path: sdk / p.Platform / "include" / "impeller.h"))
+        var headers = ImpellerLock.Rids
+            .Select(p => (p.Rid, Path: sdk / p.Rid / "include" / "impeller.h"))
             .ToArray();
 
-        // The Windows SDKs ship the header with CRLF line endings; compare content, not bytes.
+        // Compare content, not bytes, in case an archive carries CRLF line endings.
         static string Normalized(string path) => File.ReadAllText(path).ReplaceLineEndings("\n");
         var reference = Normalized(headers[0].Path);
         var different = headers.Skip(1)
             .Where(h => Normalized(h.Path) != reference)
-            .Select(h => h.Platform)
+            .Select(h => h.Rid)
             .ToArray();
 
         if (different.Length > 0)
-            throw new Exception($"impeller.h differs between {headers[0].Platform} and {string.Join(", ", different)}; bindings cannot be shared");
+            throw new Exception($"impeller.h differs between {headers[0].Rid} and {string.Join(", ", different)}; bindings cannot be shared");
 
-        Log.Information("impeller.h is identical across all {Count} platforms", headers.Length);
+        Log.Information("impeller.h is identical across all {Count} RIDs", headers.Length);
         return headers[0].Path;
     }
 
@@ -413,22 +146,22 @@ partial class Build
             throw new Exception($"No ImpellerVersion constant in {bindings}");
         var expected = uint.Parse(match.Groups[1].Value);
 
-        var host = PackagePlatforms.FirstOrDefault(p => p.Platform == HostPlatform);
-        if (host.Platform == null)
+        var host = ImpellerLock.HostRid;
+        if (ImpellerLock.Rids.All(r => r.Rid != host))
         {
-            Log.Warning("Host {Host} has no packaged native library; skipping the native version check", HostPlatform);
+            Log.Warning("Host {Host} has no packaged native library; skipping the native version check", host);
             return;
         }
 
-        var handle = NativeLibrary.Load(sdk / host.Platform / "lib" / host.Library);
+        var handle = NativeLibrary.Load(sdk / host / "lib" / ImpellerLock.LibraryOf(host));
         try
         {
             var getVersion = Marshal.GetDelegateForFunctionPointer<ImpellerGetVersionFn>(
                 NativeLibrary.GetExport(handle, "ImpellerGetVersion"));
             var actual = getVersion();
             if (actual != expected)
-                throw new Exception($"{host.Platform} native reports Impeller version {FormatImpellerVersion(actual)}, generated bindings expect {FormatImpellerVersion(expected)}");
-            Log.Information("{Platform} native matches generated IMPELLER_VERSION {Version}", host.Platform, FormatImpellerVersion(actual));
+                throw new Exception($"{host} native reports Impeller version {FormatImpellerVersion(actual)}, generated bindings expect {FormatImpellerVersion(expected)}");
+            Log.Information("{Rid} native matches generated IMPELLER_VERSION {Version}", host, FormatImpellerVersion(actual));
         }
         finally
         {
@@ -444,7 +177,7 @@ partial class Build
     // Build and test against the staged SDK + bindings
     // ---------------------------------------------------------------------------------------
 
-    AbsolutePath BuildManaged(FlutterRelease release, AbsolutePath bindings, AbsolutePath build)
+    AbsolutePath BuildManaged(ImpellerLock pin, AbsolutePath bindings, AbsolutePath build)
     {
         DotNetBuild(s => s
             .SetProjectFile(RootDirectory / "src" / "NImpeller" / "NImpeller.csproj")
@@ -452,7 +185,7 @@ partial class Build
             .SetProperty("UseArtifactsOutput", true)
             .SetProperty("ArtifactsPath", build)
             .SetProperty("NImpellerBindingsFile", bindings)
-            .SetProperty("Version", release.PackageVersion)
+            .SetProperty("Version", pin.PackageVersion)
             .SetProperty("DebugType", "embedded")
             .SetProperty("ContinuousIntegrationBuild", true));
 
@@ -474,39 +207,69 @@ partial class Build
     // Packages
     // ---------------------------------------------------------------------------------------
 
-    List<string> CreatePackages(FlutterRelease release, AbsolutePath staging, AbsolutePath sdk, AbsolutePath managedDll)
+    List<string> CreatePackages(ImpellerLock pin, AbsolutePath staging, AbsolutePath sdk, AbsolutePath managedDll)
     {
-        var version = NuGetVersion.Parse(release.PackageVersion);
+        var version = NuGetVersion.Parse(pin.PackageVersion);
         var exact = new VersionRange(version, true, version, true);
         var nimpellerCommit = RunGit(RootDirectory, "rev-parse HEAD").Trim();
-        var origin = DescribeOrigin(release);
+        var origin = DescribeOrigin(pin);
         var packages = new List<string>();
 
         var notices = staging / "THIRD-PARTY-NOTICES.txt";
-        File.WriteAllText(notices, BuildNotices(release, sdk));
+        File.WriteAllText(notices, BuildNotices(pin, sdk / ImpellerLock.Rids[0].Rid));
 
-        // Per-RID native packages.
-        foreach (var p in PackagePlatforms)
+        foreach (var (rid, library) in ImpellerLock.Rids)
         {
-            var id = $"{NativeMetaPackageId}.{p.Rid}";
-            var builder = NewBuilder(id, version, nimpellerCommit, "BSD-3-Clause",
-                $"Impeller native library (libimpeller) for {p.Rid}, used by NImpeller. {origin}");
-            builder.Tags.AddRange(new[] { "native", p.Rid });
-            AddFile(builder, sdk / p.Platform / "lib" / p.Library, $"runtimes/{p.Rid}/native/{p.Library}");
-            AddFile(builder, notices, "THIRD-PARTY-NOTICES.txt");
-            AddReadme(builder, staging, id, $"""
-                # {id}
+            var id = $"{NativeMetaPackageId}.{rid}";
+            var toolchain = DescribeToolchain(sdk / rid / "build-info.json");
 
-                The Impeller native library (`{p.Library}`) for `{p.Rid}`, from Flutter's prebuilt
-                `impeller_sdk.zip`{(p.Strip ? " (stripped of debug info)" : "")}. You normally reference `{ManagedPackageId}` (all RIDs) or
-                `{ManagedPackageId}` plus only the `{NativeMetaPackageId}.<rid>` packages you ship.
+            // The native library, stripped by impeller-builder.
+            {
+                var builder = NewBuilder(id, version, nimpellerCommit, "BSD-3-Clause",
+                    $"Impeller native library (libimpeller) for {rid}, used by NImpeller. {origin}");
+                builder.Tags.AddRange(new[] { "native", rid });
+                AddFile(builder, sdk / rid / "lib" / library, $"runtimes/{rid}/native/{library}");
+                AddFile(builder, notices, "THIRD-PARTY-NOTICES.txt");
+                AddReadme(builder, staging, id, $"""
+                    # {id}
 
-                {OriginTable(release)}
+                    The Impeller native library (`{library}`) for `{rid}`, built by
+                    {BuilderLink(pin)} without debug information. The symbols are in
+                    `{id}.Symbols`. You normally reference `{ManagedPackageId}` (all RIDs) or `{ManagedPackageId}`
+                    plus only the `{NativeMetaPackageId}.<rid>` packages you ship.
 
-                The binary is licensed under Flutter's BSD-3-Clause license and the licenses of its
-                bundled dependencies; see `THIRD-PARTY-NOTICES.txt`.
-                """);
-            packages.Add(Save(builder));
+                    {OriginTable(pin)}
+
+                    Toolchain: {toolchain}
+
+                    The binary is licensed under Flutter's BSD-3-Clause license and the licenses of its
+                    bundled dependencies; see `THIRD-PARTY-NOTICES.txt`.
+                    """);
+                packages.Add(Save(builder));
+            }
+
+            // Its debug symbols, next to the library when referenced.
+            {
+                var symbolsId = id + ".Symbols";
+                var builder = NewBuilder(symbolsId, version, nimpellerCommit, "BSD-3-Clause",
+                    $"Debug symbols of the Impeller native library for {rid}. {origin}");
+                builder.Tags.AddRange(new[] { "native", "symbols", rid });
+                var symbolsDir = sdk / rid / "symbols" / "lib";
+                foreach (var file in Directory.GetFiles(symbolsDir, "*", SearchOption.AllDirectories).Order(StringComparer.Ordinal))
+                    AddFile(builder, file, $"runtimes/{rid}/native/{Path.GetRelativePath(symbolsDir, file).Replace('\\', '/')}");
+                AddFile(builder, notices, "THIRD-PARTY-NOTICES.txt");
+                builder.DependencyGroups.Add(new PackageDependencyGroup(NuGetFramework.AnyFramework,
+                    new[] { new PackageDependency(id, exact) }));
+                AddReadme(builder, staging, symbolsId, $"""
+                    # {symbolsId}
+
+                    Debug symbols of `{library}` in `{id}` ({SymbolsKind(rid)}). Reference this package next to
+                    `{id}` to place the symbols beside the library, for debuggers and crash symbolization.
+
+                    {OriginTable(pin)}
+                    """);
+                packages.Add(Save(builder));
+            }
         }
 
         // Meta package: depends on every RID package.
@@ -515,14 +278,14 @@ partial class Build
                 $"Pulls in the Impeller native libraries for every supported RID. {origin}");
             builder.Tags.Add("native");
             builder.DependencyGroups.Add(new PackageDependencyGroup(NuGetFramework.AnyFramework,
-                PackagePlatforms.Select(p => new PackageDependency($"{NativeMetaPackageId}.{p.Rid}", exact))));
+                ImpellerLock.Rids.Select(p => new PackageDependency($"{NativeMetaPackageId}.{p.Rid}", exact))));
             AddReadme(builder, staging, NativeMetaPackageId, $"""
                 # {NativeMetaPackageId}
 
                 Meta package that references the Impeller native library for every supported RID:
-                {string.Join(", ", PackagePlatforms.Select(p => $"`{p.Rid}`"))}.
+                {string.Join(", ", ImpellerLock.Rids.Select(p => $"`{p.Rid}`"))}.
 
-                {OriginTable(release)}
+                {OriginTable(pin)}
                 """);
             packages.Add(Save(builder));
         }
@@ -537,7 +300,7 @@ partial class Build
             AddReadme(builder, staging, ManagedPackageId, $"""
                 # NImpeller
 
-                {OriginTable(release)}
+                {OriginTable(pin)}
                 """);
             packages.Add(Save(builder));
         }
@@ -545,39 +308,67 @@ partial class Build
         return packages;
     }
 
-    static string DescribeOrigin(FlutterRelease release) => release.FlutterVersion != null
-        ? $"Built from Flutter {release.FlutterVersion} (engine {release.EngineHash})."
-        : $"Built from Flutter commit {release.Commit} (engine {release.EngineHash}).";
+    static string SymbolsKind(string rid) =>
+        rid.StartsWith("win-") ? "`impeller.dll.pdb`"
+        : rid.StartsWith("osx-") ? "`libimpeller.dylib.dSYM`"
+        : "`libimpeller.so.debug`, zlib-compressed DWARF linked with `.gnu_debuglink`";
 
-    static string OriginTable(FlutterRelease release) => $"""
+    static string DescribeOrigin(ImpellerLock pin) =>
+        $"Built from Flutter {pin.Version}{(pin.Patched ? " with Avalonia patches" : "")} ({pin.Repository}@{pin.Sha[..10]}) by impeller-builder {pin.Tag}.";
+
+    static string OriginTable(ImpellerLock pin) => $"""
         | | |
         |---|---|
-        | Flutter version | {release.FlutterVersion ?? "untagged (" + release.Kind + ")"} |
-        | Flutter commit | `{release.Commit}` |
-        | Engine hash | `{release.EngineHash}` |
+        | Flutter version | {pin.Version} ({pin.Kind}) |
+        | Source | `{pin.Repository}` `{pin.Ref}`{(pin.Patched ? " (Avalonia patches)" : "")} |
+        | Commit | [`{pin.Sha}`](https://github.com/{pin.Repository}/commit/{pin.Sha}) |
+        | impeller-builder | {ReleaseLink(pin)} |
+        | `IMPELLER_VERSION` | {pin.ImpellerVersion} |
         """;
 
-    string BuildNotices(FlutterRelease release, AbsolutePath sdk)
+    // Local --builder-dir packs name a folder, not a GitHub repository.
+    static bool IsLocal(ImpellerLock pin) => pin.Builder.StartsWith("local:", StringComparison.Ordinal);
+
+    static string BuilderLink(ImpellerLock pin) =>
+        IsLocal(pin) ? "impeller-builder (local build)" : $"[{pin.Builder}](https://github.com/{pin.Builder})";
+
+    static string ReleaseLink(ImpellerLock pin) =>
+        IsLocal(pin) ? $"{pin.Tag} (local build)" : $"[{pin.Tag}](https://github.com/{pin.Builder}/releases/tag/{pin.Tag})";
+
+    static string DescribeToolchain(AbsolutePath buildInfo)
     {
-        var root = FlutterCheckout;
-        var flutterLicense = GitShow(root, release.Commit, "LICENSE")
-            ?? throw new Exception($"No LICENSE in Flutter at {release.Commit}");
-        var engineLicenses = GitShow(root, release.Commit, "engine/src/flutter/sky/packages/sky_engine/LICENSE")
-            ?? throw new Exception($"No engine/src/flutter/sky/packages/sky_engine/LICENSE in Flutter at {release.Commit}");
-        var sdkNote = File.ReadAllText(sdk / PackagePlatforms[0].Platform / "LICENSE.sdk.md");
+        if (!File.Exists(buildInfo))
+            return "unknown";
+        var toolchain = JsonNode.Parse(File.ReadAllText(buildInfo))!["toolchain"]!.AsObject();
+        return string.Join(", ", toolchain
+            .Where(p => p.Key != "visualStudioPath" && p.Value != null)
+            .Select(p => $"{p.Key} {(p.Value is JsonArray a ? string.Join(" ", a) : p.Value.ToString())}"));
+    }
+
+    static string BuildNotices(ImpellerLock pin, AbsolutePath ridDirectory)
+    {
+        var licenses = ridDirectory / "licenses";
+        string Read(string relative)
+        {
+            var path = licenses / relative;
+            return File.Exists(path) ? File.ReadAllText(path).Trim() : throw new Exception($"{path} not found");
+        }
 
         var sb = new StringBuilder();
-        sb.AppendLine("The native library in this package is Flutter's Impeller SDK (impeller_sdk.zip).");
-        sb.AppendLine(DescribeOrigin(release));
+        sb.AppendLine("The native library in this package is Flutter's Impeller SDK, built by impeller-builder.");
+        sb.AppendLine(DescribeOrigin(pin));
         sb.AppendLine();
-        sb.AppendLine("===== impeller_sdk LICENSE.sdk.md =====");
-        sb.AppendLine(sdkNote.Trim());
-        sb.AppendLine();
+        if (File.Exists(licenses / "LICENSE.sdk.md"))
+        {
+            sb.AppendLine("===== Impeller SDK LICENSE.sdk.md =====");
+            sb.AppendLine(Read("LICENSE.sdk.md"));
+            sb.AppendLine();
+        }
         sb.AppendLine("===== Flutter LICENSE =====");
-        sb.AppendLine(flutterLicense.Trim());
+        sb.AppendLine(Read("flutter/LICENSE"));
         sb.AppendLine();
         sb.AppendLine("===== Flutter engine and bundled third-party licenses (sky_engine/LICENSE) =====");
-        sb.AppendLine(engineLicenses.Trim());
+        sb.AppendLine(Read("sky_engine/LICENSE"));
         return sb.ToString();
     }
 

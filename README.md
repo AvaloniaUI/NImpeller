@@ -10,23 +10,26 @@ Generated bindings file are NOT checked into the repo. Instead, versions are bou
 
 You need the .NET 10 SDK.
 
-1) Generate the Impeller bindings. If you have never generated the bindings, they will be generated on first build of NImpeller via an MSBuild task. You should see this as `DownloadSdkAndGenerateBindings`. This task downloads the SDK for your own platform and generates the bindings from its headers. You can also use the InteropGen program directly with the `impeller.h` header, or use the Nuke task
+1) Generate the Impeller bindings. If you have never generated the bindings, they are generated on the first build of NImpeller by an MSBuild task (`DownloadSdkAndGenerateBindings`). It downloads the pinned Impeller SDK for your platform and generates the bindings from its `impeller.h`. You can also run the Nuke target:
 
 ```sh
-./build.sh GenerateBindings
+./build.sh GenerateBindings                 # the SDK of this machine
+./build.sh GenerateBindings --rid linux-x64 # the SDK of another RID
 ```
 
-to build the bindings. It uses the SDK for your own platform and downloads it if it is missing. To use the SDK of a different platform, add `--platform <platform>`.
+2) Run the Sandbox sample. `Impeller.targets` copies `external/impeller_sdk/<rid>/lib/libimpeller.*` of the host RID to the output directory.
 
-2) Run the Sandbox sample. The runtime file used is based on the `Impeller.targets` file. You can either manually set up the library you want to test with, or use the Nuke tasks below for automatically setting it up per commit, or with the latest commit. 
+```sh
+dotnet run --project samples/Sandbox -- --api OpenGL --scene mmark --backend SDL
+```
 
 #### Android Sandbox
 
-`samples/Sandbox.Android` runs the same scenes on Android with OpenGL ES or Vulkan. It needs the `android` workload and the Android NDK, which the build uses to strip `libimpeller.so` (about 225 MB unstripped). The project is not in `NImpeller.slnx`, so the solution still builds without the Android workload.
+`samples/Sandbox.Android` runs the same scenes on Android with OpenGL ES or Vulkan. It needs the `android` workload. The project is not in `NImpeller.slnx`, so the solution still builds without the Android workload.
 
 ```sh
-./build.sh DownloadLatestImpeller --platform android-arm64
-./build.sh DownloadLatestImpeller --platform android-x64
+./build.sh DownloadImpeller --rid android-arm64
+./build.sh DownloadImpeller --rid android-x64
 dotnet build samples/Sandbox.Android -t:Run
 # Open a scene directly:
 adb shell am start -n com.nimpeller.sandbox/.RenderActivity --es scene shaders --es api OpenGLES
@@ -34,72 +37,43 @@ adb shell am start -n com.nimpeller.sandbox/.RenderActivity --es scene shaders -
 
 **NOTE:** The Impeller C SDK and upstream libraries are broken for Vulkan on Android. It currently shows a single stretched pixel on swapchain at 1x1 and does not resize it on Android [(TODO(163070) in `khr_swapchain_vk.cc`)](https://github.com/flutter/flutter/blob/6b2bb92cec12bc71e01dd04b659e863e0b3c6d6f/engine/src/flutter/impeller/renderer/backend/vulkan/swapchain/khr/khr_swapchain_vk.cc#L76).
 
-### Using pre-build Impeller binaries
+### Impeller natives
 
-Flutter builds toolkit binaries on a nightly feed, that you can download from.
+The native libraries and `impeller.h` come from [AvaloniaUI/impeller-builder](https://github.com/AvaloniaUI/impeller-builder). It builds the Impeller SDK from [AvaloniaUI/flutter](https://github.com/AvaloniaUI/flutter): an `avalonia/<flutter tag>` patch branch, or an upstream release tag. `impeller.lock.json` pins one of its releases: the source commit, the Flutter version, the binding revision, and the size and SHA-256 of each archive.
 
-Typical link is `https://storage.googleapis.com/flutter_infra_release/flutter/$FLUTTER_SHA/$PLATFORM_ARCH/impeller_sdk.zip`
-Where:
-- `$FLUTTER_SHA` is a commit hash
-- `$PLATFORM_ARCH` is one of `linux-arm64`, `linux-x64`, `windows-arm64`, `windows-x64`, `darwin-arm64`, `darwin-x64` or `android-arm64`
+| Target | Does |
+|---|---|
+| `DownloadImpeller [--rid <rid>\|--all] [--symbols] [--tools]` | Downloads and checks the pinned archives, and unpacks them to `external/impeller_sdk/<rid>/` (`symbols/` and `tools/` below it). The default is the host RID. |
+| `DownloadImpeller --builder-dir <path>` | The same from a local impeller-builder `release/` folder, checked against its `manifest.json` and `SHA256SUMS`. Use it to test a builder change before it is published. |
+| `BumpImpeller --tag <version>-<sha10>` | Pins another release: rewrites the lock, sets the revision (0 for a new Flutter version, +1 for another build of the same version), regenerates the bindings and prints the API change. |
+| `CompileShaders` | Rebuilds `samples/Sandbox.Core/Shaders/*.frag.iplr` with `impellerc` from the pinned tools archive. |
 
-From this zip you will need `include/impeller.h` and `lib/impeller.so` (or `impeller.dll`/`impeller.dylib`).
-
-See [Impeller Toolkit: Prebuilt Artifacts](https://github.com/flutter/flutter/blame/908eab56e04a0925fc3c1a7d4bff1f4ae6351ae3/engine/src/flutter/impeller/toolkit/interop/README.md#L22)
-
-The files can be automatically downloaded via [Nuke](https://nuke.build/docs/getting-started/installation/) using the Powershell, Bash, or global Nuke command. Using either:
-
-```sh
-./build.sh DownloadLatestImpeller --All
-```
-
-to download the newest Impeller build by the newest commit to Flutter. To download less, replace `--All` with `--platform <platform>`, `--include-host` (the platform of this machine), or both:
-
-```sh
-./build.sh DownloadLatestImpeller --platform linux-x64 --include-host
-```
-
-Or use
-
-```sh
-./build.sh DownloadImpeller --impeller-sha (Commit Sha) --All
-```
-
-For a specific commit.
+The RIDs are `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`, `win-x64`, `win-arm64`, `android-arm64`, `android-arm` and `android-x64`. The libraries are release builds with LTO and without debug information; the symbols are in the `-symbols` archives.
 
 ### NuGet packages
 
-`Pack` builds NuGet packages from a Flutter release tag or commit, using a local
-[flutter/flutter](https://github.com/flutter/flutter) checkout (default `../flutter`) to find the
-engine build. Only `git fetch <remote> --tags` is run on it.
+`Pack` builds the NuGet packages of the pinned release:
 
 ```sh
-./build.sh Pack --flutter-ref 3.47.9                  # stable  -> 3.47.9
-./build.sh Pack --flutter-ref 3.47.9 --revision 1     # binding fix for the same release -> 3.47.9.1
-./build.sh Pack --flutter-ref 3.50.0-0.4.pre          # beta    -> 3.50.0-pre.0.4.0
-./build.sh Pack --flutter-ref a55d35a8b73             # commit  -> 3.51.0-dev.20261110.a55d35a
-./build.sh ResolveFlutterVersion --flutter-ref 3.47.9 # show the commit, engine hash and version only
+./build.sh Pack                                               # the release in impeller.lock.json
+./build.sh Pack --builder-dir ../impeller-builder/release     # local builds (all 9 RIDs)
 ```
 
-Options: `--flutter-root <path>`, `--flutter-remote <name>` (default `upstream`), `--no-fetch`.
+The version comes from the lock: Flutter `3.50.0` is `3.50.0`, or `3.50.0.N` with binding revision `N`; the beta `3.50.0-0.4.pre` is `3.50.0-pre.0.4.N`. Raise `revision` in the lock by hand for a release that changes only NImpeller.
 
-Tags use `bin/internal/engine.version`, other commits use Flutter's content-aware hash. The SDK for
-every desktop RID is downloaded and bindings are generated into `artifacts/staging/<version>/`
-(`external/impeller_sdk` and `Generated/Bindings.g.cs` are not touched). The target then checks
-that `impeller.h` is the same on all platforms and that the host native library matches the
-generated `IMPELLER_VERSION`, and runs the unit tests. Packages go to `artifacts/packages/`:
+The archives of every RID and bindings are staged in `artifacts/staging/<version>/` (`external/impeller_sdk` and `Generated/Bindings.g.cs` are not touched). The target checks that `impeller.h` is the same on all RIDs and that the host native library matches the generated `IMPELLER_VERSION`, and runs the unit tests. Packages go to `artifacts/packages/`:
 
 - `NImpeller`: managed bindings, depends on `NImpeller.Native` (exact version)
 - `NImpeller.Native`: meta package that depends on every RID package
-- `NImpeller.Native.<rid>`: `runtimes/<rid>/native/` for `linux-x64`, `linux-arm64`, `osx-x64`,
-  `osx-arm64`, `win-x64`, `win-arm64`, `android-arm64`, `android-arm`, `android-x64`
+- `NImpeller.Native.<rid>`: the library in `runtimes/<rid>/native/`
+- `NImpeller.Native.<rid>.Symbols`: its debug symbols (`.so.debug`, `.dylib.dSYM` or `.dll.pdb`) in `runtimes/<rid>/native/`, next to the library
 
 ### Releasing
 
-Run the Release workflow (`.github/workflows/release.yml`):
-
-- `flutter_ref`: Flutter tag or commit (empty = latest stable tag)
-- `revision`: binding revision on top of the same Flutter release (default `0`)
+1. Push the Avalonia patches to `avalonia/<flutter tag>` in AvaloniaUI/flutter (or use an upstream tag as is).
+2. Run **Build Impeller** in AvaloniaUI/impeller-builder with that ref. It publishes `<flutter tag>-<sha10>`.
+3. Run `./build.sh BumpImpeller --tag <flutter tag>-<sha10>` and `./test-headless.sh`, and commit `impeller.lock.json`.
+4. Run the Release workflow (`.github/workflows/release.yml`) on that commit.
 
 ### Handles
 

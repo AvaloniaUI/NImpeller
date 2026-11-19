@@ -14,42 +14,42 @@
     </PropertyGroup>
     
     <ItemGroup Condition="$(TargetFramework.Contains('-windows')) == true AND '$(IsArm64)' == 'true'">
-        <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-arm64\lib\impeller.dll">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\win-arm64\lib\impeller.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>impeller.dll</TargetPath>
         </None>
     </ItemGroup>
     
     <ItemGroup Condition="$(TargetFramework.Contains('-windows')) == true AND '$(IsArm64)' == 'false'">
-        <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-x64\lib\impeller.dll">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\win-x64\lib\impeller.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>impeller.dll</TargetPath>
         </None>
     </ItemGroup>
     
     <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsWindows) AND '$(IsArm64)' == 'true'">
-        <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-arm64\lib\impeller.dll">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\win-arm64\lib\impeller.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>impeller.dll</TargetPath>
         </None>
     </ItemGroup>
     
     <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsWindows) AND '$(IsArm64)' == 'false'">
-        <None Visible="false" Include="$(ImpellerSdkDirectory)\windows-x64\lib\impeller.dll">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\win-x64\lib\impeller.dll">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>impeller.dll</TargetPath>
         </None>
     </ItemGroup>
     
     <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsOSX) AND '$(IsArm64)' == 'true'">
-        <None Visible="false" Include="$(ImpellerSdkDirectory)\darwin-arm64\lib\libimpeller.dylib">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\osx-arm64\lib\libimpeller.dylib">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>libimpeller.dylib</TargetPath>
         </None>
     </ItemGroup>
 
     <ItemGroup Condition="$(TargetFramework.Contains('-')) == false AND $(IsOSX) AND '$(IsArm64)' == 'false'">
-        <None Visible="false" Include="$(ImpellerSdkDirectory)\darwin-x64\lib\libimpeller.dylib">
+        <None Visible="false" Include="$(ImpellerSdkDirectory)\osx-x64\lib\libimpeller.dylib">
             <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
             <TargetPath>libimpeller.dylib</TargetPath>
         </None>

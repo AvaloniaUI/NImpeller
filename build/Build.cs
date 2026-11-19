@@ -1,75 +1,53 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.IO.Compression;
 using System.Linq;
-using System.Net.Http;
-using System.Runtime.InteropServices;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Nuke.Common;
-using Nuke.Common.CI;
-using Nuke.Common.Execution;
 using Nuke.Common.IO;
-using Nuke.Common.ProjectModel;
 using Nuke.Common.Tooling;
 using Nuke.Common.Tools.DotNet;
-using Nuke.Common.Tools.Git;
-using Nuke.Common.Utilities.Collections;
 using Serilog;
-using static Nuke.Common.EnvironmentInfo;
-using static Nuke.Common.IO.PathConstruction;
-using static Nuke.Common.Tools.DotMemoryUnit.DotMemoryUnitTasks;
 using static Nuke.Common.Tools.DotNet.DotNetTasks;
 
+// The natives come from the AvaloniaUI/impeller-builder release pinned in impeller.lock.json:
+//
+//   ./build.sh DownloadImpeller [--rid <rid>|--all] [--symbols] [--tools] [--builder-dir <path>]
+//   ./build.sh GenerateBindings [--rid <rid>]
+//   ./build.sh BumpImpeller --tag <version>-<sha10>
+//   ./build.sh CompileShaders
 partial class Build : NukeBuild
 {
-    /// Support plugins are available for:
-    ///   - JetBrains ReSharper        https://nuke.build/resharper
-    ///   - JetBrains Rider            https://nuke.build/rider
-    ///   - Microsoft VisualStudio     https://nuke.build/visualstudio
-    ///   - Microsoft VSCode           https://nuke.build/vscode
-
     public static int Main () => Execute<Build>(x => x.Compile);
 
     [Parameter("Configuration to build - Default is 'Debug' (local) or 'Release' (server)")]
     readonly Configuration Configuration = IsLocalBuild ? Configuration.Debug : Configuration.Release;
 
-    [Parameter("Flutter commit SHA for Impeller SDK download")]
-    readonly string ImpellerSha;
+    [Parameter("RID of the Impeller SDK (linux-x64, osx-arm64, win-x64, android-arm64, ...) - Default is the host")]
+    readonly string Rid;
 
-    [Parameter("Platform to download (linux-x64, darwin-arm64, etc.)")]
-    readonly string Platform;
-
-    [Parameter("Download all platforms")]
+    [Parameter("All RIDs of the lock file")]
     readonly bool All;
 
-    [Parameter("Also download the SDK for the current host platform (native library for local runs)")]
-    readonly bool IncludeHost;
+    [Parameter("Also unpack the debug symbols archive")]
+    readonly bool Symbols;
 
-    [Parameter("Extract downloaded files")]
-    readonly bool Extract = true;
+    [Parameter("Also unpack the tools archive (impellerc), desktop RIDs only")]
+    readonly bool Tools;
 
-    [Parameter("Keep zip files after extraction")]
-    readonly bool KeepZip;
+    [Parameter("Read the archives from a local impeller-builder release/ folder instead of the pinned release")]
+    readonly AbsolutePath BuilderDir;
 
-    static readonly string[] SupportedPlatforms =
-    {
-        "linux-arm64",
-        "linux-x64",
-        "windows-arm64",
-        "windows-x64",
-        "darwin-arm64",
-        "darwin-x64",
-        "android-arm64",
-        "android-arm",
-        "android-x86",
-        "android-x64"
-    };
+    [Parameter("impeller-builder release tag to pin, <flutter version>-<sha10>")]
+    readonly string Tag;
 
-    const string BaseUrl = "https://storage.googleapis.com/flutter_infra_release/flutter";
-    const string EngineRepo = "https://github.com/flutter/flutter.git";
+    [Parameter("GitHub repository of the impeller-builder releases - Default is the lock's, or AvaloniaUI/impeller-builder")]
+    readonly string Builder;
 
-    AbsolutePath OutputDirectory => RootDirectory / "external" / "impeller_sdk";
+    AbsolutePath SdkDirectory => RootDirectory / "external" / "impeller_sdk";
+    AbsolutePath BindingsFile => RootDirectory / "src" / "NImpeller" / "Generated" / "Bindings.g.cs";
 
     Target Clean => _ => _
         .Before(Restore)
@@ -88,200 +66,131 @@ partial class Build : NukeBuild
         {
         });
 
-    Target GenerateBindings => _ => _
-        .Description("Generate Impeller bindings from impeller.h using InteropGen")
-        .Executes(async () =>
-        {
-            var platform = Platform ?? HostPlatform
-                ?? throw new Exception($"No Impeller SDK available for this host ({RuntimeInformation.OSDescription}, {RuntimeInformation.OSArchitecture}); pass --platform");
-
-            if (!SupportedPlatforms.Contains(platform))
-            {
-                throw new Exception($"Platform {platform} is unsupported");
-            }
-
-            if (!File.Exists(OutputDirectory / platform / "include" / "impeller.h"))
-            {
-                Log.Information("Impeller SDK for {Platform} not found, downloading it", platform);
-                await DownloadPlatformAsync(ImpellerSha ?? GetLatestSha(), platform);
-            }
-
-            GenerateBindingsWithPlatform(platform);
-        });
-
-    Target ListImpellerCommits => _ => _
-        .Description("List available Flutter engine commits")
-        .Executes(() =>
-        {
-            Log.Information("Fetching Flutter engine commits...");
-            Log.Information("");
-            Log.Information("Latest Flutter Engine Commits:");
-            Log.Information("===============================");
-
-            var headSha = GitTasks.Git("ls-remote " + EngineRepo + " HEAD", logOutput: false)
-                .FirstOrDefault().Text.Split('\t')[0];
-
-            if (!string.IsNullOrEmpty(headSha))
-            {
-                Log.Information("{Sha} (HEAD)", headSha);
-            }
-
-            Log.Information("");
-            Log.Information("Recent tagged releases:");
-
-            var tags = GitTasks.Git("ls-remote --tags " + EngineRepo, logOutput: false)
-                .Where(x => !x.Text.Contains("^{}"))
-                .TakeLast(10);
-
-            foreach (var tag in tags)
-            {
-                var parts = tag.Text.Split('\t');
-                var sha = parts[0];
-                var tagName = parts[1].Replace("refs/tags/", "");
-                Log.Information("{Sha}  ({Tag})", sha, tagName);
-            }
-        });
-
     Target DownloadImpeller => _ => _
-        .Description("Download Impeller SDK for specified platform(s)")
-        .Requires(() => ImpellerSha)
-        .Requires(() => Platform != null || All || IncludeHost)
+        .Description("Download, verify and unpack the pinned Impeller SDK into external/impeller_sdk/<rid>/")
         .Executes(async () =>
         {
-
-            await DownloadRequestedPlatformsAsync(ImpellerSha);
-        });
-
-    Target DownloadLatestImpeller => _ => _
-        .Description("Download Impeller SDK for the latest Flutter engine commit")
-        .Requires(() => Platform != null || All || IncludeHost)
-        .Executes(async () =>
-        {
-
-            var sha = GetLatestSha();
-
-            await DownloadRequestedPlatformsAsync(sha);
-        });
-
-    static string HostPlatform
-    {
-        get
-        {
-            var os = OperatingSystem.IsWindows() ? "windows"
-                : OperatingSystem.IsMacOS() ? "darwin"
-                : OperatingSystem.IsLinux() ? "linux"
-                : null;
-            var arch = RuntimeInformation.OSArchitecture switch
+            var fetcher = ImpellerFetcher.Create(RootDirectory, BuilderDir);
+            var parts = ImpellerParts.Main | (Symbols ? ImpellerParts.Symbols : 0);
+            foreach (var rid in RequestedRids(fetcher.Lock))
             {
-                Architecture.X64 => "x64",
-                Architecture.Arm64 => "arm64",
-                _ => null
+                var ridParts = parts | (Tools && ImpellerLock.IsDesktop(rid) ? ImpellerParts.Tools : 0);
+                var dir = await fetcher.EnsureAsync(SdkDirectory, rid, ridParts);
+                Log.Information("{Rid}: {Tag} in {Dir}", rid, fetcher.Lock.Tag, dir);
+            }
+        });
+
+    Target GenerateBindings => _ => _
+        .Description("Generate the bindings from the pinned impeller.h with InteropGen")
+        .Executes(async () =>
+        {
+            var fetcher = ImpellerFetcher.Create(RootDirectory, BuilderDir);
+            var dir = await fetcher.EnsureAsync(SdkDirectory, Rid ?? ImpellerLock.HostRid, ImpellerParts.Main);
+            RunInteropGen((AbsolutePath)dir / "include" / "impeller.h", BindingsFile);
+        });
+
+    Target BumpImpeller => _ => _
+        .Description("Pin an impeller-builder release (--tag) in impeller.lock.json, regenerate and print the API change")
+        .Requires(() => Tag)
+        .Executes(async () =>
+        {
+            var old = File.Exists(ImpellerLock.PathIn(RootDirectory)) ? ImpellerLock.Read(RootDirectory) : null;
+            var builder = Builder ?? old?.Builder ?? ImpellerLock.DefaultBuilder;
+
+            using var http = ImpellerFetcher.NewHttpClient();
+            var url = $"https://github.com/{builder}/releases/download/{Tag}/manifest.json";
+            Log.Information("Reading {Url}", url);
+            var manifest = JsonNode.Parse(await http.GetStringAsync(url))!.AsObject();
+            if (manifest["tag"]!.GetValue<string>() != Tag)
+                throw new Exception($"{url} is the manifest of {manifest["tag"]}, not {Tag}");
+
+            // The revision restarts for a new Flutter version and goes up for another build of the same version.
+            var version = manifest["version"]!.GetValue<string>();
+            var revision = old == null || old.Version != version ? 0
+                : old.Tag == Tag ? old.Revision
+                : old.Revision + 1;
+            var pinned = ImpellerLock.FromManifest(manifest, builder, revision);
+            pinned.RequireComplete();
+            pinned = pinned with
+            {
+                Assets = pinned.Assets
+                    .Where(a => ImpellerLock.Rids.Any(r => r.Rid == a.Key))
+                    .ToDictionary(a => a.Key, a => a.Value),
             };
-            return os != null && arch != null ? $"{os}-{arch}" : null;
-        }
-    }
+            pinned.Write(RootDirectory);
 
-    async Task DownloadRequestedPlatformsAsync(string sha)
-    {
-        if (All && (!string.IsNullOrEmpty(Platform) || IncludeHost))
+            Log.Information("Pinned {Tag}: Flutter {Version} ({Kind}{Patched}) from {Repository}@{Sha}", pinned.Tag,
+                pinned.Version, pinned.Kind, pinned.Patched ? ", patched" : "", pinned.Repository, pinned.Sha[..10]);
+            Log.Information("Package version {Old} -> {New}", old?.PackageVersion ?? "(none)", pinned.PackageVersion);
+            Log.Information("IMPELLER_VERSION {Old} -> {New}", old?.ImpellerVersion ?? "(none)", pinned.ImpellerVersion);
+
+            var before = File.Exists(BindingsFile) ? PublicMembers(File.ReadAllText(BindingsFile)) : new SortedSet<string>();
+            var dir = await ImpellerFetcher.Create(RootDirectory, null).EnsureAsync(SdkDirectory, ImpellerLock.HostRid, ImpellerParts.Main);
+            RunInteropGen((AbsolutePath)dir / "include" / "impeller.h", BindingsFile);
+            var after = PublicMembers(File.ReadAllText(BindingsFile));
+
+            var removed = before.Except(after).ToArray();
+            var added = after.Except(before).ToArray();
+            Log.Information("Generated API: {Added} added, {Removed} removed", added.Length, removed.Length);
+            foreach (var member in removed)
+                Log.Information("  - {Member}", member);
+            foreach (var member in added)
+                Log.Information("  + {Member}", member);
+        });
+
+    Target CompileShaders => _ => _
+        .Description("Rebuild samples/Sandbox.Core/Shaders/*.frag.iplr with impellerc from the pinned tools archive")
+        .Executes(async () =>
         {
-            throw new Exception("--all cannot be combined with --platform or --include-host");
-        }
+            var rid = ImpellerLock.HostRid;
+            var dir = (AbsolutePath)await ImpellerFetcher.Create(RootDirectory, BuilderDir)
+                .EnsureAsync(SdkDirectory, rid, ImpellerParts.Main | ImpellerParts.Tools);
+            var impellerc = dir / "tools" / "bin" / (OperatingSystem.IsWindows() ? "impellerc.exe" : "impellerc");
+            var shaderLib = dir / "tools" / "shader_lib";
+            var shaders = RootDirectory / "samples" / "Sandbox.Core" / "Shaders";
+            var spirv = RootDirectory / "artifacts" / "shaders";
+            spirv.CreateOrCleanDirectory();
 
+            foreach (var source in Directory.GetFiles(shaders, "*.frag").Order(StringComparer.Ordinal))
+            {
+                var name = Path.GetFileName(source);
+                ProcessTasks.StartProcess(impellerc,
+                        $"--runtime-stage-gles --runtime-stage-gles3 --runtime-stage-metal --runtime-stage-vulkan " +
+                        $"--iplr --input={name} --sl={name}.iplr --spirv={spirv / (name + ".spv")} --include={shaderLib}",
+                        workingDirectory: shaders)
+                    .AssertZeroExitCode();
+                Log.Information("Compiled {Shader}.iplr", name);
+            }
+        });
+
+    IEnumerable<string> RequestedRids(ImpellerLock lockFile)
+    {
+        if (All && Rid != null)
+            throw new Exception("--all cannot be combined with --rid");
         if (All)
-        {
-            await DownloadAllPlatformsAsync(sha);
-            return;
-        }
-
-        var platforms = new List<string>();
-
-        if (!string.IsNullOrEmpty(Platform))
-        {
-            if (!SupportedPlatforms.Contains(Platform))
-            {
-                throw new Exception($"Invalid platform: {Platform}. Valid platforms: {string.Join(", ", SupportedPlatforms)}");
-            }
-            platforms.Add(Platform);
-        }
-
-        if (IncludeHost)
-        {
-            var host = HostPlatform;
-            if (host == null || !SupportedPlatforms.Contains(host))
-            {
-                throw new Exception($"No Impeller SDK available for this host ({RuntimeInformation.OSDescription}, {RuntimeInformation.OSArchitecture})");
-            }
-            if (!platforms.Contains(host))
-            {
-                platforms.Add(host);
-            }
-        }
-
-        foreach (var platform in platforms)
-        {
-            await DownloadPlatformAsync(sha, platform);
-        }
+            return lockFile.Assets.Keys;
+        return new[] { Rid ?? ImpellerLock.HostRid };
     }
 
-    async Task DownloadAllPlatformsAsync(string sha)
+    // Public members of the generated bindings, one line each, for the API change of a bump.
+    static SortedSet<string> PublicMembers(string source)
     {
-        Log.Information("Downloading all platforms for SHA: {Sha}", sha);
-        Log.Information("");
-
-        var successCount = 0;
-        var failCount = 0;
-
-        foreach (var platform in SupportedPlatforms)
+        var members = new SortedSet<string>(StringComparer.Ordinal);
+        string type = null;
+        foreach (var raw in source.Split('\n'))
         {
-            try
+            var line = raw.Trim();
+            var typeMatch = Regex.Match(line, @"^public\s+(?:(?:sealed|static|partial|unsafe|readonly|ref)\s+)*(?:class|struct|enum|record)\s+(\w+)");
+            if (typeMatch.Success)
             {
-                await DownloadPlatformAsync(sha, platform);
-                successCount++;
+                type = typeMatch.Groups[1].Value;
+                members.Add(line.TrimEnd('{').Trim());
+                continue;
             }
-            catch (Exception ex)
-            {
-                Log.Error(ex, "Failed to download {Platform}", platform);
-                failCount++;
-            }
-            Log.Information("");
+            if (line.StartsWith("public ", StringComparison.Ordinal))
+                members.Add($"{type}: {Regex.Replace(line, @"\s*(=>.*|\{.*|=[^>].*)$", "").TrimEnd(';')}");
         }
-
-        Log.Information("===============================");
-        Log.Information("Successfully downloaded: {Count} platforms", successCount);
-        if (failCount > 0)
-        {
-            Log.Warning("Failed downloads: {Count} platforms", failCount);
-        }
-    }
-
-    string GetLatestSha()
-    {
-        Log.Information("Fetching latest engine commit SHA...");
-        var sha = GitTasks.Git("ls-remote " + EngineRepo + " HEAD", logOutput: false)
-            .FirstOrDefault().Text.Split('\t')[0];
-
-        if (string.IsNullOrEmpty(sha))
-        {
-            throw new Exception("Failed to fetch latest commit SHA");
-        }
-
-        Log.Information("Latest SHA: {Sha}", sha);
-        Log.Information("");
-        return sha;
-    }
-
-    void GenerateBindingsWithPlatform(string platform)
-    {
-        var impellerHeaderPath = OutputDirectory / platform / "include" / "impeller.h";
-
-        if (!File.Exists(impellerHeaderPath))
-        {
-            throw new Exception($"Impeller header file not found at: {impellerHeaderPath}");
-        }
-
-        Log.Information("Found impeller.h at: {Path}", impellerHeaderPath);
-        RunInteropGen(impellerHeaderPath, RootDirectory / "src" / "NImpeller" / "Generated" / "Bindings.g.cs");
+        return members;
     }
 
     void RunInteropGen(AbsolutePath header, AbsolutePath output)
@@ -293,7 +202,7 @@ partial class Build : NukeBuild
             .SetProjectFile(interopGenProject)
             .SetConfiguration(Configuration));
 
-        Log.Information("Running InteropGen to generate bindings...");
+        Log.Information("Running InteropGen on {Header}", header);
 
         DotNetRun(s => s
             .SetProjectFile(interopGenProject)
@@ -301,92 +210,8 @@ partial class Build : NukeBuild
             .SetNoBuild(true)
             .SetApplicationArguments(header, output));
 
-        if (File.Exists(output))
-        {
-            var fileSize = new FileInfo(output).Length / 1024.0;
-            Log.Information("Successfully generated bindings at: {Path} ({Size:F2} KB)", output, fileSize);
-        }
-        else
-        {
+        if (!File.Exists(output))
             throw new Exception("Failed to generate bindings - output file not found");
-        }
-    }
-
-    Task DownloadPlatformAsync(string sha, string platform) =>
-        DownloadPlatformAsync(sha, platform, OutputDirectory);
-
-    async Task DownloadPlatformAsync(string sha, string platform, AbsolutePath sdkRoot)
-    {
-        var url = $"{BaseUrl}/{sha}/{platform}/impeller_sdk.zip";
-        var platformDir = sdkRoot / platform;
-        var zipFile = platformDir / "impeller_sdk.zip";
-
-        platformDir.CreateOrCleanDirectory();
-
-        Log.Information("Checking availability: {Platform}", platform);
-
-        using var httpClient = new HttpClient();
-        httpClient.Timeout = TimeSpan.FromMinutes(10);
-
-        // Check if URL exists
-        var headResponse = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, url));
-        if (!headResponse.IsSuccessStatusCode)
-        {
-            throw new Exception($"SDK not available for {platform} at SHA {sha}\nURL: {url}");
-        }
-
-        Log.Information("Downloading {Platform}...", platform);
-
-        // Download the file
-        var response = await httpClient.GetAsync(url);
-        response.EnsureSuccessStatusCode();
-
-        await using var fileStream = File.Create(zipFile);
-        await response.Content.CopyToAsync(fileStream);
-        await fileStream.FlushAsync();
-        fileStream.Close();
-
-        var fileInfo = new FileInfo(zipFile);
-        var fileSize = fileInfo.Length / 1024.0 / 1024.0;
-        Log.Information("Downloaded {Platform} ({Size:F2} MB)", platform, fileSize);
-
-        // Extract if requested
-        if (Extract)
-        {
-            Log.Information("Extracting {Platform}...", platform);
-            ZipFile.ExtractToDirectory(zipFile, platformDir);
-            Log.Information("Extracted to {Directory}", platformDir);
-
-            // Show extracted files
-            var libExt = GetLibExtension(platform);
-            var headerPath = platformDir / "include" / "impeller.h";
-            var libPath1 = platformDir / "lib" / $"impeller.{libExt}";
-            var libPath2 = platformDir / "lib" / $"libimpeller.{libExt}";
-
-            if (File.Exists(headerPath))
-            {
-                Log.Information("  - include/impeller.h");
-            }
-            if (File.Exists(libPath1) || File.Exists(libPath2))
-            {
-                Log.Information("  - lib/impeller.{Extension}", libExt);
-            }
-
-            // Remove zip if not keeping
-            if (!KeepZip)
-            {
-                File.Delete(zipFile);
-                Log.Information("Removed zip file");
-            }
-        }
-    }
-
-    static string GetLibExtension(string platform)
-    {
-        if (platform.StartsWith("windows-"))
-            return "dll";
-        if (platform.StartsWith("darwin-"))
-            return "dylib";
-        return "so";
+        Log.Information("Generated {Path} ({Size:F2} KB)", output, new FileInfo(output).Length / 1024.0);
     }
 }

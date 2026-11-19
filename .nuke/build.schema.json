@@ -24,14 +24,13 @@
     "ExecutableTarget": {
       "type": "string",
       "enum": [
+        "BumpImpeller",
         "Clean",
         "Compile",
+        "CompileShaders",
         "DownloadImpeller",
-        "DownloadLatestImpeller",
         "GenerateBindings",
-        "ListImpellerCommits",
         "Pack",
-        "ResolveFlutterVersion",
         "Restore"
       ]
     },
@@ -108,7 +107,15 @@
       "properties": {
         "All": {
           "type": "boolean",
-          "description": "Download all platforms"
+          "description": "All RIDs of the lock file"
+        },
+        "Builder": {
+          "type": "string",
+          "description": "GitHub repository of the impeller-builder releases - Default is the lock's, or AvaloniaUI/impeller-builder"
+        },
+        "BuilderDir": {
+          "type": "string",
+          "description": "Read the archives from a local impeller-builder release/ folder instead of the pinned release"
         },
         "Configuration": {
           "type": "string",
@@ -118,50 +125,21 @@
             "Release"
           ]
         },
-        "Extract": {
+        "Rid": {
+          "type": "string",
+          "description": "RID of the Impeller SDK (linux-x64, osx-arm64, win-x64, android-arm64, ...) - Default is the host"
+        },
+        "Symbols": {
           "type": "boolean",
-          "description": "Extract downloaded files"
+          "description": "Also unpack the debug symbols archive"
         },
-        "FlutterRef": {
+        "Tag": {
           "type": "string",
-          "description": "Flutter tag or commit to package (default: latest stable tag)"
+          "description": "impeller-builder release tag to pin, <flutter version>-<sha10>"
         },
-        "FlutterRemote": {
-          "type": "string",
-          "description": "Git remote of the Flutter checkout to fetch tags from (default: upstream)"
-        },
-        "FlutterRoot": {
-          "type": "string",
-          "description": "Path to a flutter/flutter checkout (default: ../flutter)"
-        },
-        "ImpellerSha": {
-          "type": "string",
-          "description": "Flutter commit SHA for Impeller SDK download"
-        },
-        "IncludeHost": {
+        "Tools": {
           "type": "boolean",
-          "description": "Also download the SDK for the current host platform (native library for local runs)"
-        },
-        "KeepZip": {
-          "type": "boolean",
-          "description": "Keep zip files after extraction"
-        },
-        "LlvmStrip": {
-          "type": "string",
-          "description": "Path to llvm-strip, used to strip the Android libraries (default: from the Android NDK, then PATH)"
-        },
-        "NoFetch": {
-          "type": "boolean",
-          "description": "Do not fetch tags from the Flutter remote"
-        },
-        "Platform": {
-          "type": "string",
-          "description": "Platform to download (linux-x64, darwin-arm64, etc.)"
-        },
-        "Revision": {
-          "type": "integer",
-          "description": "Binding revision on top of the same Flutter release (stable: 4th version part, beta: last prerelease part)",
-          "format": "int32"
+          "description": "Also unpack the tools archive (impellerc), desktop RIDs only"
         }
       }
     },

@@ -76,9 +76,18 @@ public sealed record ImpellerLock(
     static readonly Regex BetaVersion = new(@"^(\d+)\.(\d+)\.0-(\d+)\.(\d+)\.pre$");
 
     /// <summary>
-    /// The NuGet version: stable 3.47.9 (revision 0) or 3.47.9.N, beta 3.50.0-0.4.pre as 3.50.0-pre.0.4.N.
+    /// The NuGet version: stable 3.47.9 (revision 0) or 3.47.9.N, beta 3.50.0-0.4.pre as 3.50.0-pre.0.4.N. A local
+    /// build is a prerelease of the next revision, such as 3.50.0.4-local.mytag.
     /// </summary>
-    public string PackageVersion => PackageVersionOf(Version, Kind, Revision);
+    public string PackageVersion => Builder.StartsWith("local:", StringComparison.Ordinal)
+        ? LocalVersionOf(PackageVersionOf(Version, Kind, Revision + 1), Tag)
+        : PackageVersionOf(Version, Kind, Revision);
+
+    static string LocalVersionOf(string version, string tag)
+    {
+        var label = "local." + Regex.Replace(tag, "[^0-9A-Za-z-]", "-");
+        return version + (version.Contains('-') ? "." : "-") + label;
+    }
 
     public static string PackageVersionOf(string version, string kind, int revision)
     {

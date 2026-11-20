@@ -45,6 +45,10 @@ partial class Build
             var pin = fetcher.Lock;
             if (BuilderDir == null)
                 pin.RequireComplete();
+            // A local release may hold only some targets; its packages cover those.
+            var targets = ImpellerLock.Targets.Where(pin.Assets.ContainsKey).ToArray();
+            if (targets.Length < ImpellerLock.Targets.Count())
+                Log.Warning("Packing only {Targets}", string.Join(", ", targets));
             LogPin(pin);
             WarnIfWorkingTreeDirty();
 
@@ -52,10 +56,10 @@ partial class Build
             staging.CreateOrCleanDirectory();
             var sdk = staging / "sdk";
 
-            foreach (var target in ImpellerLock.Targets)
+            foreach (var target in targets)
                 await fetcher.EnsureAsync(sdk, target, ImpellerParts.Main | ImpellerParts.Symbols);
 
-            var header = VerifyHeadersIdentical(sdk);
+            var header = VerifyHeadersIdentical(sdk, targets);
 
             var bindings = staging / "Bindings.g.cs";
             RunInteropGen(header, bindings);
@@ -67,7 +71,7 @@ partial class Build
             RunUnitTests(sdk, bindings, build);
 
             PackagesDirectory.CreateDirectory();
-            var packages = CreatePackages(pin, staging, sdk, managedDll);
+            var packages = CreatePackages(pin, staging, sdk, managedDll, targets);
 
             Log.Information("");
             Log.Information("Packages written to {Directory}:", PackagesDirectory);
@@ -115,9 +119,9 @@ partial class Build
     // Verification
     // ---------------------------------------------------------------------------------------
 
-    static AbsolutePath VerifyHeadersIdentical(AbsolutePath sdk)
+    static AbsolutePath VerifyHeadersIdentical(AbsolutePath sdk, string[] targets)
     {
-        var headers = ImpellerLock.Targets
+        var headers = targets
             .Select(t => (Rid: t, Path: sdk / t / "include" / "impeller.h"))
             .ToArray();
 
@@ -207,8 +211,10 @@ partial class Build
     // Packages
     // ---------------------------------------------------------------------------------------
 
-    List<string> CreatePackages(ImpellerLock pin, AbsolutePath staging, AbsolutePath sdk, AbsolutePath managedDll)
+    List<string> CreatePackages(ImpellerLock pin, AbsolutePath staging, AbsolutePath sdk, AbsolutePath managedDll,
+        string[] targets)
     {
+        var rids = ImpellerLock.Rids.Where(r => targets.Contains(r.Rid)).ToArray();
         var version = NuGetVersion.Parse(pin.PackageVersion);
         var exact = new VersionRange(version, true, version, true);
         var nimpellerCommit = RunGit(RootDirectory, "rev-parse HEAD").Trim();
@@ -216,9 +222,9 @@ partial class Build
         var packages = new List<string>();
 
         var notices = staging / "THIRD-PARTY-NOTICES.txt";
-        File.WriteAllText(notices, BuildNotices(pin, sdk / ImpellerLock.Rids[0].Rid));
+        File.WriteAllText(notices, BuildNotices(pin, sdk / rids[0].Rid));
 
-        foreach (var (rid, library) in ImpellerLock.Rids)
+        foreach (var (rid, library) in rids)
         {
             var id = $"{NativeMetaPackageId}.{rid}";
             var toolchain = DescribeToolchain(sdk / rid / "build-info.json");
@@ -272,7 +278,7 @@ partial class Build
             }
         }
 
-        foreach (var (platform, frameworkDirs, platformDescription) in ImpellerLock.ApplePlatforms)
+        foreach (var (platform, frameworkDirs, platformDescription) in ImpellerLock.ApplePlatforms.Where(p => targets.Contains(p.Platform)))
             packages.AddRange(CreateApplePackages(pin, staging, sdk, notices, version, exact, nimpellerCommit, origin,
                 platform, frameworkDirs, platformDescription));
 
@@ -282,12 +288,12 @@ partial class Build
                 $"Pulls in the Impeller native libraries for every supported RID and Apple platform. {origin}");
             builder.Tags.Add("native");
             builder.DependencyGroups.Add(new PackageDependencyGroup(NuGetFramework.AnyFramework,
-                ImpellerLock.Targets.Select(t => new PackageDependency($"{NativeMetaPackageId}.{t}", exact))));
+                targets.Select(t => new PackageDependency($"{NativeMetaPackageId}.{t}", exact))));
             AddReadme(builder, staging, NativeMetaPackageId, $"""
                 # {NativeMetaPackageId}
 
                 Meta package that references the Impeller native library for every supported RID and Apple platform:
-                {string.Join(", ", ImpellerLock.Targets.Select(t => $"`{t}`"))}.
+                {string.Join(", ", targets.Select(t => $"`{t}`"))}.
 
                 {OriginTable(pin)}
                 """);

@@ -761,3 +761,79 @@ public sealed class FragmentProgramScene : IScene
         }
     }
 }
+
+public sealed class GlyphRunsScene : IScene
+{
+    public string TestName => "glyphruns";
+
+    // Ahem glyphs: a full box, a box below the baseline, a box above it, and a blank.
+    private static readonly ushort[] Glyphs = { 58, 82, 100, 3, 58 };
+
+    private static readonly ImpellerColor[] Stops =
+    {
+        ImpellerColor.FromRgb(230, 60, 60), ImpellerColor.FromRgb(60, 120, 230),
+    };
+
+    public void Render(ImpellerContext context, ImpellerDisplayListBuilder b, SceneParameters p)
+    {
+        Draw.Background(b, ImpellerColor.FromRgb(245, 245, 245));
+
+        var path = System.IO.Path.Combine(System.AppContext.BaseDirectory, "Assets", "Ahem.ttf");
+        using var memory = new ImpellerUnmanagedMemory(System.IO.File.ReadAllBytes(path));
+        using var typeface = Draw.NotNull(ImpellerTypeface.New(memory, 0));
+
+        const float size = 30;
+        var positions = new ImpellerPoint[Glyphs.Length];
+        for (var i = 0; i < positions.Length; i++)
+            positions[i] = Draw.P(i * size, 0);
+
+        using var paint = ImpellerPaint.New()!;
+        paint.SetColor(ImpellerColor.FromRgb(20, 30, 40));
+
+        // Left column: rasterization options. Fractional origins show the edging.
+        DrawRun(b, typeface, size, default, positions, paint, 20.5f, 50.25f);
+        DrawRun(b, typeface, size, new ImpellerGlyphRunOptions { Edging = ImpellerFontEdging.kImpellerFontEdgingAlias },
+            positions, paint, 20.5f, 110.25f);
+        DrawRun(b, typeface, size, new ImpellerGlyphRunOptions { Embolden = 1 }, positions, paint, 20.5f, 170.25f);
+        DrawRun(b, typeface, size, new ImpellerGlyphRunOptions { Skew_x = -0.3f }, positions, paint, 20.5f, 230.25f);
+
+        // Right column: paints that draw the glyph outlines.
+        using (var gradient = Draw.NotNull(ImpellerColorSource.CreateLinearGradientNew(
+                   Draw.P(200, 0), Draw.P(350, 0), Stops, new[] { 0f, 1f }, ImpellerTileMode.kImpellerTileModeClamp)))
+        using (var fill = ImpellerPaint.New()!)
+        {
+            fill.SetColorSource(gradient);
+            DrawRun(b, typeface, size, default, positions, fill, 200, 50);
+        }
+
+        using (var stroke = ImpellerPaint.New()!)
+        {
+            stroke.SetColor(ImpellerColor.FromRgb(40, 140, 80));
+            stroke.SetDrawStyle(ImpellerDrawStyle.kImpellerDrawStyleStroke);
+            stroke.SetStrokeWidth(6);
+            DrawRun(b, typeface, size, default, positions, stroke, 200, 110);
+        }
+
+        // Transformed: the atlas rasterizes at the scaled size.
+        b.Save();
+        b.Translate(200, 230);
+        b.Scale(1.5f, 1.5f);
+        DrawRun(b, typeface, size * 0.6f, default, Scaled(positions, 0.6f), paint, 0, 0);
+        b.Restore();
+    }
+
+    private static ImpellerPoint[] Scaled(ImpellerPoint[] positions, float scale)
+    {
+        var result = new ImpellerPoint[positions.Length];
+        for (var i = 0; i < positions.Length; i++)
+            result[i] = Draw.P(positions[i].X * scale, positions[i].Y * scale);
+        return result;
+    }
+
+    private static void DrawRun(ImpellerDisplayListBuilder b, ImpellerTypeface typeface, float size,
+        ImpellerGlyphRunOptions options, ImpellerPoint[] positions, ImpellerPaint paint, float x, float y)
+    {
+        using var run = Draw.NotNull(typeface.GlyphRunNew(size, options, Glyphs, positions));
+        b.DrawGlyphRun(run, Draw.P(x, y), paint);
+    }
+}

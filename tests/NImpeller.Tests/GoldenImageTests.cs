@@ -43,6 +43,7 @@ public sealed class GoldenImageTests
         new GradientsScene(),      360, 310,
         new CpuTextureScene(),     240, 200,
         new CustomFontScene(),     360, 260,
+        new GlyphRunsScene(),      380, 270,
         new FragmentProgramScene(), 300, 180);
 
     public static TheoryData<string> SceneNames()

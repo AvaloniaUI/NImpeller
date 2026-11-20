@@ -8,6 +8,22 @@ class Generator
         return char.ToUpperInvariant(s[0]) + s.Substring(1);
     }
 
+    // An element count: an integer named "count" or "*_count".
+    static bool IsCountParam(NativeVar p) =>
+        NativeNullableType.Unwrap(p.Type) is NativePrimitiveType { DotnetType: "uint" or "ulong" or "int" }
+        && (p.Name == "count" || p.Name.EndsWith("_count"));
+
+    // A non-null const pointer to primitives or plain structs, which after a count is an array of that many elements.
+    static bool IsArrayParam(NativeVar p, IReadOnlyDictionary<string, string> manualMarshal) =>
+        p.Type is not NativeNullableType { Nullable: true }
+        && NativeNullableType.Unwrap(p.Type) is NativePointerType { Level: 1, IsConst: true, IsString: false, IsVoidPtr: false } pt
+        && NativeNullableType.Unwrap(pt.ElementType) switch
+        {
+            NativePrimitiveType prim => prim.DotnetType != "void",
+            NativeStruct ns => !manualMarshal.ContainsKey(ns.Name),
+            _ => false,
+        };
+
     static bool IsOutParam(NativeType type) =>
         NativeNullableType.Unwrap(type) is NativePointerType
         {
@@ -286,16 +302,52 @@ class Generator
                                     hiddenParams.Add(args[i].Name);
                             }
 
+                            // A count followed by array pointers becomes spans of equal length; the count is
+                            // their length. arrays maps each array to its count, counts each count to its arrays.
+                            var arrays = new Dictionary<string, string>();
+                            var counts = new Dictionary<string, List<string>>();
+                            for (var i = 0; i < args.Count; i++)
+                            {
+                                if (!IsCountParam(args[i]))
+                                    continue;
+                                var group = new List<string>();
+                                for (var j = i + 1; j < args.Count && IsArrayParam(args[j], manualMarshal); j++)
+                                {
+                                    group.Add(args[j].Name);
+                                    arrays[args[j].Name] = args[i].Name;
+                                }
+                                if (group.Count > 0)
+                                    counts[args[i].Name] = group;
+                            }
+
+                            string ElementType(NativeVar p) =>
+                                MapInteropType(((NativePointerType)NativeNullableType.Unwrap(p.Type)).ElementType, false, false);
+
+                            string ParamDecl(NativeVar p)
+                            {
+                                if (arrays.ContainsKey(p.Name))
+                                    return $"global::System.ReadOnlySpan<{ElementType(p)}> {p.Name}";
+                                return (IsOutParam(p.Type) ? "out " : "") + MapDotnetType(p.Type, true) + " " + p.Name;
+                            }
+
                             var retType = MapDotnetType(f.ReturnType, true);
                             var decl = $"{retType} {name}(" +
-                                       string.Join(", ", args.Where(p => !hiddenParams.Contains(p.Name)).Select(p =>
-                                           (IsOutParam(p.Type) ? "out " : "") + MapDotnetType(p.Type, true) + " " + p.Name)) +
+                                       string.Join(", ", args
+                                           .Where(p => !hiddenParams.Contains(p.Name) && !counts.ContainsKey(p.Name))
+                                           .Select(ParamDecl)) +
                                        ")";
                             if (isFactory)
                                 decl = "static " + decl;
                             using (gen.Line("public " + decl).Scope())
                             using (gen.Line("unsafe").Scope())
                             {
+                                foreach (var group in counts.Values)
+                                    foreach (var other in group.Skip(1))
+                                        gen.Line($"if ({other}.Length != {group[0]}.Length) throw new global::System.ArgumentException(\"{other} and {group[0]} must have the same length.\", nameof({other}));");
+                                var pins = new Stack<IDisposable>();
+                                foreach (var array in args.Where(p => arrays.ContainsKey(p.Name)))
+                                    pins.Push(gen.Line($"fixed ({ElementType(array)}* __{array.Name} = {array.Name})").Scope());
+
                                 var isVoidRet = retType == "void";
                                 var invocation = "";
                                 if (!isVoidRet)
@@ -316,6 +368,10 @@ class Generator
 
                                     if (hiddenParams.Contains(a.Name))
                                         invocation += "global::System.IntPtr.Zero";
+                                    else if (counts.TryGetValue(a.Name, out var countedArrays))
+                                        invocation += $"({MapInteropType(a.Type, false, false)}){countedArrays[0]}.Length";
+                                    else if (arrays.ContainsKey(a.Name))
+                                        invocation += $"__{a.Name}";
                                     else if (argType is NativeHandle argHandle)
                                         // An invalid SafeHandle marshals as nullptr.
                                         invocation += argNullable
@@ -391,6 +447,9 @@ class Generator
                                     else
                                         gen.Line("return ret;");
                                 }
+
+                                while (pins.Count > 0)
+                                    pins.Pop().Dispose();
                             }
                         }
                         catch (UseManualInteropException)

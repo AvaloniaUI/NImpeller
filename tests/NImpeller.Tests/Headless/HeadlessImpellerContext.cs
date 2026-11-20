@@ -141,6 +141,7 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
     {
         uint fbo = _gl.GenFramebuffer();
         uint tex = _gl.GenTexture();
+        uint depthStencil = _gl.GenRenderbuffer();
         try
         {
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, fbo);
@@ -151,6 +152,13 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
             _gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
             _gl.FramebufferTexture2D(FramebufferTarget.Framebuffer, FramebufferAttachment.ColorAttachment0,
                 TextureTarget.Texture2D, tex, 0);
+
+            // Impeller fills complex paths and clips with the stencil buffer.
+            _gl.BindRenderbuffer(RenderbufferTarget.Renderbuffer, depthStencil);
+            _gl.RenderbufferStorage(RenderbufferTarget.Renderbuffer, InternalFormat.Depth24Stencil8,
+                (uint)width, (uint)height);
+            _gl.FramebufferRenderbuffer(FramebufferTarget.Framebuffer, FramebufferAttachment.DepthStencilAttachment,
+                RenderbufferTarget.Renderbuffer, depthStencil);
 
             var status = _gl.CheckFramebufferStatus(FramebufferTarget.Framebuffer);
             if (status != GLEnum.FramebufferComplete)
@@ -191,6 +199,7 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
             _gl.BindFramebuffer(FramebufferTarget.Framebuffer, 0);
             _gl.DeleteFramebuffer(fbo);
             _gl.DeleteTexture(tex);
+            _gl.DeleteRenderbuffer(depthStencil);
         }
     }
 

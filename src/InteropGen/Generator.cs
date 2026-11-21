@@ -13,6 +13,10 @@ class Generator
         NativeNullableType.Unwrap(p.Type) is NativePrimitiveType { DotnetType: "uint" or "ulong" or "int" }
         && (p.Name == "count" || p.Name.EndsWith("_count"));
 
+    // A C bool, passed to native code as an int.
+    static bool IsBoolParam(NativeVar p) =>
+        ReferenceEquals(NativeNullableType.Unwrap(p.Type), NativePrimitiveType.Map[CppAst.CppPrimitiveKind.Bool]);
+
     // A non-null const pointer to primitives or plain structs, which after a count is an array of that many elements.
     static bool IsArrayParam(NativeVar p, IReadOnlyDictionary<string, string> manualMarshal) =>
         p.Type is not NativeNullableType { Nullable: true }
@@ -38,16 +42,21 @@ class Generator
             // Handles passed as array
             "ImpellerColorSourceCreateFragmentProgramNew",
             "ImpellerImageFilterCreateFragmentProgramNew",
-            "ImpellerContextCreateOpenGLESNew",
             "ImpellerParagraphBuilderAddText",
-            "ImpellerContextCreateMetalNew",
-            "ImpellerContextCreateVulkanNew",
             "ImpellerColorSourceCreateLinearGradientNew",
             "ImpellerColorSourceCreateRadialGradientNew",
             "ImpellerColorSourceCreateConicalGradientNew",
             "ImpellerColorSourceCreateSweepGradientNew",
             "ImpellerTypographyContextRegisterFont"
         };
+        // Callbacks that native code calls only during the call that receives them. A callback of these types
+        // becomes a delegate that is kept alive for the call and passed through its user data.
+        var callTimeCallbacks = new HashSet<string>()
+        {
+            "ImpellerProcAddressCallback",
+            "ImpellerVulkanProcAddressCallback"
+        };
+
         var fastFunctions = new HashSet<string>()
         {
             "ImpellerPaintNew",
@@ -216,6 +225,60 @@ class Generator
             }
             
 
+            static bool IsUserData(NativeVar v) => v.Type.IsVoidPtr && (v.Name == "user_data" || v.Name.EndsWith("_user_data"));
+
+            NativeNamedFunctionPointer? CallTimeCallback(NativeType type) =>
+                NativeNullableType.Unwrap(type) is NativeNamedFunctionPointer fp && callTimeCallbacks.Contains(fp.Name)
+                    ? fp
+                    : null;
+
+            // A struct passed by pointer that carries a call-time callback and its user data.
+            NativeStruct? CallbackStruct(NativeVar p) =>
+                NativeNullableType.Unwrap(p.Type) is NativePointerType { Level: 1, ElementType: NativeStruct ns }
+                && ns.Members.Any(m => CallTimeCallback(m.Type) != null)
+                && ns.Members.Any(IsUserData)
+                    ? ns
+                    : null;
+
+            // Callback arguments and results: pointers pass as IntPtr, which delegates can take.
+            string CallbackType(NativeType t) =>
+                NativeNullableType.Unwrap(t) is NativePointerType ? "global::System.IntPtr" : MapInteropType(t, false, false);
+
+            string CallbackArgType(NativeVar v, bool strings) =>
+                strings && v.Type.IsString ? "string" : CallbackType(v.Type);
+
+            string CallbackDelegate(NativeFunctionPointer fp, bool strings)
+            {
+                var args = fp.Parameters.Where(a => !IsUserData(a)).Select(a => CallbackArgType(a, strings)).ToList();
+                var ret = CallbackType(fp.ReturnType);
+                if (ret == "void")
+                    return args.Count == 0 ? "global::System.Action" : $"global::System.Action<{string.Join(", ", args)}>";
+                return $"global::System.Func<{string.Join(", ", args.Append(ret))}>";
+            }
+
+            string CallbackPointer(NativeNamedFunctionPointer fp) =>
+                $"(global::System.IntPtr)(delegate* unmanaged[Cdecl]<{string.Join(", ", fp.Parameters.Select(a => CallbackType(a.Type)).Append(CallbackType(fp.ReturnType)))}>)&ImpellerCallbacks.{fp.Name}";
+
+            static bool HasStringArgs(NativeFunctionPointer fp) => fp.Parameters.Any(a => a.Type.IsString);
+
+            var callbackTypes = model.Functions.SelectMany(f => f.Parameters.Select(p => p.Type))
+                .Concat(model.Structs.SelectMany(st => st.Members.Select(m => m.Type)))
+                .Select(CallTimeCallback).OfType<NativeNamedFunctionPointer>()
+                .GroupBy(fp => fp.Name).Select(g => g.First()).OrderBy(fp => fp.Name).ToList();
+            using (gen.Line("static unsafe class ImpellerCallbacks").Scope())
+            {
+                foreach (var fp in callbackTypes)
+                {
+                    var args = fp.Parameters.Select(a => CallbackType(a.Type) + " " + a.Name);
+                    var userData = fp.Parameters.First(IsUserData).Name;
+                    var call = $"ImpellerCallbackScope.Get<{CallbackDelegate(fp, false)}>({userData})(" +
+                               string.Join(", ", fp.Parameters.Where(a => !IsUserData(a)).Select(a => a.Name)) + ")";
+                    gen.Line("[global::System.Runtime.InteropServices.UnmanagedCallersOnly(CallConvs = [typeof(global::System.Runtime.CompilerServices.CallConvCdecl)])]");
+                    gen.Line($"internal static {CallbackType(fp.ReturnType)} {fp.Name}({string.Join(", ", args)}) => {call};");
+                    gen.Line();
+                }
+            }
+
             string MapDotnetType(NativeType type, bool allowHandles)
             {
                 if (NativeNullableType.Unwrap(type) is NativePointerType { ElementType: NativeStruct ns, Level: 1 } &&
@@ -323,22 +386,81 @@ class Generator
                             string ElementType(NativeVar p) =>
                                 MapInteropType(((NativePointerType)NativeNullableType.Unwrap(p.Type)).ElementType, false, false);
 
-                            string ParamDecl(NativeVar p)
+                            // The API version argument, always the version the bindings were generated from.
+                            static bool IsVersionParam(NativeVar p) =>
+                                p.Name == "version" && NativeNullableType.Unwrap(p.Type) is NativePrimitiveType { DotnetType: "uint" };
+
+                            // A call-time callback followed by its user data becomes one delegate parameter.
+                            var callbacks = new Dictionary<string, NativeNamedFunctionPointer>();
+                            var callbackUserData = new HashSet<string>();
+                            for (var i = 0; i + 1 < args.Count; i++)
+                                if (CallTimeCallback(args[i].Type) is { } fp && IsUserData(args[i + 1]))
+                                {
+                                    callbacks[args[i].Name] = fp;
+                                    callbackUserData.Add(args[i + 1].Name);
+                                }
+
+                            // A struct carrying a call-time callback is passed as its other members.
+                            var callbackStructs = args.Select(p => (p, ns: CallbackStruct(p)))
+                                .Where(x => x.ns != null).ToDictionary(x => x.p.Name, x => x.ns!);
+
+                            // The delegate parameters, (parameter, callback type), in declaration order.
+                            var delegateParams = args.SelectMany(p =>
+                                    callbackStructs.TryGetValue(p.Name, out var cs)
+                                        ? cs.Members.Where(m => CallTimeCallback(m.Type) != null)
+                                            .Select(m => (m.Name, CallTimeCallback(m.Type)!))
+                                        : callbacks.TryGetValue(p.Name, out var cb)
+                                            ? new[] { (p.Name, cb) }
+                                            : Array.Empty<(string, NativeNamedFunctionPointer)>())
+                                .ToList();
+
+                            IEnumerable<string> ParamDecls(NativeVar p, bool strings)
                             {
-                                if (arrays.ContainsKey(p.Name))
-                                    return $"global::System.ReadOnlySpan<{ElementType(p)}> {p.Name}";
-                                return (IsOutParam(p.Type) ? "out " : "") + MapDotnetType(p.Type, true) + " " + p.Name;
+                                if (callbackStructs.TryGetValue(p.Name, out var cs))
+                                {
+                                    foreach (var m in cs.Members.Where(m => !IsUserData(m)))
+                                        yield return CallTimeCallback(m.Type) is { } mfp
+                                            ? $"{CallbackDelegate(mfp, strings)} {m.Name}"
+                                            : $"{(IsBoolParam(m) ? "bool" : MapDotnetType(m.Type, false))} {m.Name}";
+                                }
+                                else if (callbacks.TryGetValue(p.Name, out var fp))
+                                    yield return $"{CallbackDelegate(fp, strings)} {p.Name}";
+                                else if (arrays.ContainsKey(p.Name))
+                                    yield return $"global::System.ReadOnlySpan<{ElementType(p)}> {p.Name}";
+                                else if (IsBoolParam(p))
+                                    yield return "bool " + p.Name;
+                                else
+                                    yield return (IsOutParam(p.Type) ? "out " : "") + MapDotnetType(p.Type, true) + " " + p.Name;
                             }
 
+                            var publicArgs = args.Where(p => !hiddenParams.Contains(p.Name) && !counts.ContainsKey(p.Name) &&
+                                                             !IsVersionParam(p) && !callbackUserData.Contains(p.Name)).ToList();
                             var retType = MapDotnetType(f.ReturnType, true);
-                            var decl = $"{retType} {name}(" +
-                                       string.Join(", ", args
-                                           .Where(p => !hiddenParams.Contains(p.Name) && !counts.ContainsKey(p.Name))
-                                           .Select(ParamDecl)) +
-                                       ")";
-                            if (isFactory)
-                                decl = "static " + decl;
-                            using (gen.Line("public " + decl).Scope())
+                            string Decl(bool strings) => (isFactory ? "static " : "") + $"{retType} {name}(" +
+                                string.Join(", ", publicArgs.SelectMany(p => ParamDecls(p, strings))) + ")";
+
+                            // Callbacks with string arguments also get an overload that takes them as strings.
+                            if (delegateParams.Any(d => HasStringArgs(d.Item2)))
+                            {
+                                var forwarded = publicArgs.SelectMany(p =>
+                                    callbackStructs.TryGetValue(p.Name, out var cs)
+                                        ? cs.Members.Where(m => !IsUserData(m)).Select(m => m.Name)
+                                        : new[] { p.Name }).Select(n =>
+                                {
+                                    var d = delegateParams.FirstOrDefault(x => x.Item1 == n);
+                                    if (d.Item2 == null || !HasStringArgs(d.Item2))
+                                        return n;
+                                    var cbArgs = d.Item2.Parameters.Where(a => !IsUserData(a)).ToList();
+                                    return "(" + string.Join(", ", cbArgs.Select(a => $"{CallbackType(a.Type)} __{a.Name}")) +
+                                           ") => " + n + "(" + string.Join(", ", cbArgs.Select(a => a.Type.IsString
+                                               ? $"global::System.Runtime.InteropServices.Marshal.PtrToStringUTF8(__{a.Name})!"
+                                               : $"__{a.Name}")) + ")";
+                                });
+                                gen.Line($"public {Decl(true)} => {name}({string.Join(", ", forwarded)});");
+                                gen.Line();
+                            }
+
+                            using (gen.Line("public " + Decl(false)).Scope())
                             using (gen.Line("unsafe").Scope())
                             {
                                 foreach (var group in counts.Values)
@@ -366,12 +488,35 @@ class Generator
                                     var argType = NativeNullableType.Unwrap(a.Type);
                                     var argNullable = a.Type is NativeNullableType { Nullable: true };
 
-                                    if (hiddenParams.Contains(a.Name))
+                                    if (IsVersionParam(a))
+                                        invocation += "UnsafeNativeMethods.ImpellerVersion";
+                                    else if (callbacks.TryGetValue(a.Name, out var callback))
+                                    {
+                                        gen.Line($"using var __{a.Name} = new ImpellerCallbackScope({a.Name});");
+                                        invocation += CallbackPointer(callback);
+                                    }
+                                    else if (callbackUserData.Contains(a.Name))
+                                        invocation += $"__{args[index - 1].Name}.UserData";
+                                    else if (callbackStructs.TryGetValue(a.Name, out var cbStruct))
+                                    {
+                                        var cbMember = cbStruct.Members.First(m => CallTimeCallback(m.Type) != null);
+                                        gen.Line($"using var __{cbMember.Name} = new ImpellerCallbackScope({cbMember.Name});");
+                                        var fields = cbStruct.Members.Select(m =>
+                                            $"{Pascal(m.Name)} = " + (IsUserData(m) ? $"__{cbMember.Name}.UserData"
+                                                : CallTimeCallback(m.Type) is { } mfp ? CallbackPointer(mfp)
+                                                : IsBoolParam(m) ? $"{m.Name} ? 1 : 0"
+                                                : m.Name));
+                                        gen.Line($"var __{a.Name} = new {gns}.{cbStruct.Name} {{ {string.Join(", ", fields)} }};");
+                                        invocation += $"&__{a.Name}";
+                                    }
+                                    else if (hiddenParams.Contains(a.Name))
                                         invocation += "global::System.IntPtr.Zero";
                                     else if (counts.TryGetValue(a.Name, out var countedArrays))
                                         invocation += $"({MapInteropType(a.Type, false, false)}){countedArrays[0]}.Length";
                                     else if (arrays.ContainsKey(a.Name))
                                         invocation += $"__{a.Name}";
+                                    else if (IsBoolParam(a))
+                                        invocation += $"({a.Name} ? 1 : 0)";
                                     else if (argType is NativeHandle argHandle)
                                         // An invalid SafeHandle marshals as nullptr.
                                         invocation += argNullable

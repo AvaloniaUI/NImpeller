@@ -20,6 +20,9 @@ public sealed class ImpellerGLFixture : IDisposable
     public RawImage Render(IScene scene, int width, int height) =>
         new(width, height, _context.Render(scene, width, height));
 
+    public RawImage RenderWithSdfs(IScene scene, int width, int height) =>
+        new(width, height, _context.RenderWithSdfs(scene, width, height));
+
     public (RawImage Image, ulong CreatedHandle, ulong ReportedHandle) RenderTextureInterop(int width, int height)
     {
         var result = _context.RenderTextureInterop(width, height);

@@ -160,6 +160,8 @@ class NativeModel
         if (type is CppQualifiedType qt)
             return MapType(qt.ElementType);
         
+        if (type is CppTypedef { Name: "bool" })
+            return NativePrimitiveType.Map[CppPrimitiveKind.Bool];
         if (_typeMap.TryGetValue(type, out var mapped))
             return mapped;
         if (type is CppTypedef td)

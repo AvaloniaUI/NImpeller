@@ -69,6 +69,33 @@ public sealed class GoldenImageTests
         GoldenAssert.Matches(sceneName, actual, PerChannelTolerance, MaxDiffFraction);
     }
 
+    private static readonly Dictionary<string, SceneCase> SdfCases = BuildCases(
+        new SolidShapesScene(),    320, 280,
+        new PrimitivesScene(),     360, 280);
+
+    public static TheoryData<string> SdfSceneNames()
+    {
+        var data = new TheoryData<string>();
+        foreach (var name in SdfCases.Keys)
+        {
+            data.Add(name);
+        }
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(SdfSceneNames))]
+    public void Scene_matches_golden_with_sdfs(string sceneName)
+    {
+        RenderGate.Require(_gl);
+
+        var @case = SdfCases[sceneName];
+        var actual = _gl.RenderWithSdfs(@case.Scene, @case.Width, @case.Height);
+        Assert.True(actual.HasContent(), $"Scene '{sceneName}' produced an empty (all-zero) image.");
+
+        GoldenAssert.Matches(sceneName + "-sdfs", actual, PerChannelTolerance, MaxDiffFraction);
+    }
+
     private static Dictionary<string, SceneCase> BuildCases(params object[] entries)
     {
         var dict = new Dictionary<string, SceneCase>();

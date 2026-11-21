@@ -20,6 +20,7 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
     private Window* _window;
     private void* _glContext;
     private ImpellerContext _impeller = null!;
+    private ImpellerContext? _impellerSdf;
 
     public bool Available { get; private set; }
 
@@ -122,6 +123,7 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
 
     private void TeardownGL()
     {
+        try { _impellerSdf?.Dispose(); } catch { /* best effort */ }
         try { _impeller?.Dispose(); } catch { /* best effort */ }
         if (_glContext != null) { _sdl.GLDeleteContext(_glContext); }
         if (_window != null) { _sdl.DestroyWindow(_window); }
@@ -131,13 +133,29 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
     public ImpellerContext Impeller => _impeller;
 
     public byte[] Render(IScene scene, int width, int height) =>
-        Invoke(() => RenderToFbo(width, height,
+        Invoke(() => RenderToFbo(_impeller, width, height,
             builder => scene.Render(_impeller, builder, new SceneParameters { Width = width, Height = height })));
+
+    // Renders with a second context, on the same GL context, that draws with signed distance fields.
+    public byte[] RenderWithSdfs(IScene scene, int width, int height) =>
+        Invoke(() =>
+        {
+            if (_impellerSdf == null)
+            {
+                using var options = ImpellerContextOptions.New()!;
+                options.SetUseSDFs(true);
+                _impellerSdf = ImpellerContext.CreateOpenGLESWithOptionsNew(
+                        name => (IntPtr)_sdl.GLGetProcAddress(name), options)
+                    ?? throw new InvalidOperationException("ImpellerContext.CreateOpenGLESWithOptionsNew returned null");
+            }
+            return RenderToFbo(_impellerSdf, width, height,
+                builder => scene.Render(_impellerSdf, builder, new SceneParameters { Width = width, Height = height }));
+        });
 
     public TextureInteropResult RenderTextureInterop(int width, int height) =>
         Invoke(() => RenderTextureInteropCore(width, height));
 
-    private byte[] RenderToFbo(int width, int height, Action<ImpellerDisplayListBuilder> record)
+    private byte[] RenderToFbo(ImpellerContext impeller, int width, int height, Action<ImpellerDisplayListBuilder> record)
     {
         uint fbo = _gl.GenFramebuffer();
         uint tex = _gl.GenTexture();
@@ -166,7 +184,7 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
                 throw new InvalidOperationException($"Offscreen framebuffer incomplete: {status}");
             }
 
-            using var surface = _impeller.SurfaceCreateWrappedFBONew((ulong)fbo,
+            using var surface = impeller.SurfaceCreateWrappedFBONew((ulong)fbo,
                 ImpellerPixelFormat.kImpellerPixelFormatRGBA8888, new ImpellerISize(width, height))
                 ?? throw new InvalidOperationException("SurfaceCreateWrappedFBONew returned null");
 
@@ -239,7 +257,7 @@ internal sealed unsafe class HeadlessImpellerContext : IDisposable
         {
             reportedHandle = texture.GetOpenGLHandle();
 
-            pixels = RenderToFbo(width, height, builder =>
+            pixels = RenderToFbo(_impeller, width, height, builder =>
             {
                 using var background = ImpellerPaint.New()!;
                 background.SetColor(ImpellerColor.FromRgb(30, 30, 30));
